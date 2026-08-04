@@ -1,93 +1,112 @@
 # sign-test
 
+Bàn thử chức năng ký — **một màn duy nhất**, chạy trên contract của collection
+*"Signing Service — Toàn bộ luồng ký (p12 / MPKI App / eSign Cloud OTP)"*.
 
+## Chạy
 
-## Getting started
-
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
-
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
-
-## Add your files
-
-* [Create](https://docs.gitlab.com/user/project/repository/web_editor/#create-a-file) or [upload](https://docs.gitlab.com/user/project/repository/web_editor/#upload-a-file) files
-* [Add files using the command line](https://docs.gitlab.com/topics/git/add_files/#add-files-to-a-git-repository) or push an existing Git repository with the following command:
-
-```
-cd existing_repo
-git remote add origin https://gitlab.com/snoziroh/sign-test.git
-git branch -M main
-git push -uf origin main
+```bash
+npm install
+npm run dev
 ```
 
-## Integrate with your tools
+Mở http://localhost:3000 — đó là màn ký, không có login, không có điều hướng.
 
-* [Set up project integrations](https://gitlab.com/snoziroh/sign-test/-/settings/integrations)
+### Chọn môi trường dịch vụ ký
 
-## Collaborate with your team
+Địa chỉ API đổi **ngay trên giao diện**: nút hiển thị base URL ở góc trên bên
+phải → nhập địa chỉ → *Kiểm tra kết nối* → *Lưu*. Giá trị nằm trong
+`localStorage` và được gắn vào mọi lời gọi qua header `X-Signing-Base-Url`, nên
+chuyển qua lại giữa localhost / domain nội bộ / IP public không cần khởi động
+lại dev server.
 
-* [Invite team members and collaborators](https://docs.gitlab.com/user/project/members/)
-* [Create a new merge request](https://docs.gitlab.com/user/project/merge_requests/creating_merge_requests/)
-* [Automatically close issues from merge requests](https://docs.gitlab.com/user/project/issues/managing_issues/#closing-issues-automatically)
-* [Enable merge request approvals](https://docs.gitlab.com/user/project/merge_requests/approvals/)
-* [Set auto-merge](https://docs.gitlab.com/user/project/merge_requests/auto_merge/)
+`.env.local` chỉ còn là **giá trị dự phòng** khi chưa đặt gì trên giao diện:
 
-## Test and Deploy
+```
+SIGNING_API_URL=http://localhost:8080
+```
 
-Use the built-in continuous integration in GitLab.
+Chưa có cả hai thì mọi lời gọi trả `500 SIGNING_API_NOT_CONFIGURED`.
 
-* [Get started with GitLab CI/CD](https://docs.gitlab.com/ci/quick_start/)
-* [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/user/application_security/sast/)
-* [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/topics/autodevops/requirements/)
-* [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/user/clusters/agent/)
-* [Set up protected environments](https://docs.gitlab.com/ci/environments/protected_environments/)
+Trình duyệt **không** gọi thẳng base URL đó: request luôn đi qua route
+`/api/signing/*` của chính ứng dụng này. Nhờ vậy không vướng CORS và dùng được
+với host chỉ cho phép gọi server-to-server.
 
-***
+## Ba luồng ký
 
-# Editing this README
+`POST /api/v1/sign` là cửa vào duy nhất. Nguồn chữ ký và bước giao dịch nằm
+trong part `request` của multipart, không nằm ở URL. `authenticationMode` của
+nguồn (đọc từ `/capabilities`) quyết định màn hình chờ:
 
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
+| Nguồn | `authenticationMode` | Cách hoàn tất |
+|---|---|---|
+| PKCS#12 (.p12/.pfx) | `NONE` | Ký xong ngay trong response của START |
+| FPT MPKI App | `APP_CONFIRMATION` | Request bị giữ ~300 giây tới khi người ký xác nhận trên điện thoại |
+| FPT eSign Cloud | `REDIRECT_OTP` | START → CONTINUE (xác nhận danh tính) → CONTINUE (lấy file) |
 
-## Suggestions for a good README
+### Những chỗ tốn tiền
 
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
+- Mỗi lần **START** của eSign Cloud là một lượt ký bị trừ.
+- **CONTINUE từ `PENDING_IDENTITY`** mở giao dịch OTP: thêm billCode, trừ một
+  lượt ký. Màn hình chỉ tự chạy bước này khi agreement đã `READY` — lúc đó danh
+  tính xác nhận xong rồi, stage này không còn là một quyết định. Agreement chưa
+  biết trạng thái thì người dùng phải tự bấm.
+- **CONTINUE từ `PENDING_OTP`** chỉ đọc chữ ký, lặp bao nhiêu lần cũng được.
+  Không thăm dò theo nhịp: chạy đúng một lần khi cửa sổ nhập OTP đóng lại, hoặc
+  khi người dùng bấm.
+- `POST /remote-ca/fpt/enrollments/{uuid}/status` **không** phải thao tác đọc:
+  mỗi lần gọi trừ một lượt ký. Nó nằm sau hai lần bấm trong mục "Công cụ nâng cao".
 
-## Name
-Choose a self-explaining name for your project.
+### `agreementUuid`
 
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
+Định danh người ký trên CA, dùng lại cho mọi lần ký sau. Ký thẳng khi chưa có
+uuid vẫn chạy (service tự đăng ký) nhưng response ký **không trả uuid về** — nên
+màn hình có nút *Đăng ký và lấy agreementUuid* gọi
+`POST /remote-ca/fpt/enrollments` riêng, rồi lưu uuid vào `localStorage`.
 
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
+### `targetSignatureId` của counter-sign
 
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
+Service sinh id chữ ký nhưng không trả về. Màn hình quét ngược từ chính file
+đang chọn: PDF đọc khoá `/FISSignatureId`, XML đọc thuộc tính `Id` của
+`<ds:Signature>`. Vẫn còn ô nhập tay cho PDF ký bằng công cụ khác (id dạng
+`sha256:<hex của CMS>`).
 
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
+### baseline T luôn gọi TSA
 
-## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
+`BaselineLevel.T.requiresTimestamp()` = true và engine bật timestamp chỉ dựa vào
+baselineLevel, không đọc `signing.tsa.enabled`. Cấu hình TSA sai chỉ lộ ra ở lần
+ký đầu tiên dưới dạng `422 SIGNING_FAILED`. Ký thử với baseline **B** để tách
+bạch lỗi TSA khỏi lỗi luồng ký.
 
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
+## Cấu trúc
 
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
+```
+app/page.tsx                       màn ký (Server Component)
+app/api/signing/**                 proxy sang dịch vụ ký, không gắn token
+features/signing/
+  api-base-url.ts                  base URL cấu hình trên giao diện (localStorage)
+  sign-api.ts                      client của Signing Service
+  sign-configuration.ts            dựng & validate request ký
+  sign-record-store.ts             giữ phiên eSign Cloud + agreementUuid
+  document-format.ts               nhận diện định dạng, quét chữ ký đích
+  components/                      workspace, preview, hộp thoại phiên ký
+lib/server/sign-proxy.ts           chỗ DUY NHẤT chạm tới địa chỉ backend
+lib/types/signing.ts               contract với backend
+lib/i18n/                          từ điển EN/VI
+```
 
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
+### Nếu dịch vụ thật bật xác thực trở lại
 
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
+Chỉ cần sửa `signApiFetch` trong `lib/server/sign-proxy.ts` để gắn header
+`Authorization` — không route handler nào biết tới token.
 
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
+## Đường API đang dùng
 
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
-
-## License
-For open source projects, say how it is licensed.
-
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+| Frontend | Backend |
+|---|---|
+| `GET /api/signing/capabilities` | `GET /api/v1/capabilities` |
+| `POST /api/signing/sign` | `POST /api/v1/sign` (multipart: `request`, `file`, `p12File`) |
+| `GET /api/signing/remote-ca/mpki/credentials?username=` | `GET /api/v1/remote-ca/mpki/credentials` |
+| `GET /api/signing/remote-ca/mpki/credentials/{id}` | `GET /api/v1/remote-ca/mpki/credentials/{id}` |
+| `POST /api/signing/remote-ca/fpt/enrollments` | `POST /api/v1/remote-ca/fpt/enrollments` |
+| `POST /api/signing/remote-ca/fpt/enrollments/{uuid}/status` | tương ứng dưới `/api/v1` |
