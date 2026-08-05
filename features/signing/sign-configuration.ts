@@ -39,8 +39,8 @@ export interface EnrollmentFormState {
 }
 
 /**
- * Bốn trường FPT bắt buộc để mở một đăng ký. Địa chỉ và ảnh giấy tờ KHÔNG nằm ở
- * đây — chúng gửi rỗng vẫn được nhận.
+ * Bốn trường chữ bắt buộc để mở một đăng ký. Địa chỉ KHÔNG nằm ở đây — gửi rỗng
+ * vẫn được nhận.
  *
  * Danh sách này là nguồn duy nhất cho cả ba chỗ: dấu bắt buộc trên nhãn, điều
  * kiện bật nút đăng ký, và điều kiện bật nút ký.
@@ -54,8 +54,26 @@ export const REQUIRED_ENROLLMENT_KEYS = [
 
 export type RequiredEnrollmentKey = (typeof REQUIRED_ENROLLMENT_KEYS)[number];
 
+/**
+ * Hai mặt CCCD cũng bắt buộc: FPT nhận đăng ký thiếu ảnh, nhưng hồ sơ đó không
+ * qua được bước xác nhận danh tính — tức là tốn một giao dịch để lấy về một
+ * agreement không bao giờ READY. Chặn ngay tại form rẻ hơn nhiều.
+ *
+ * Ảnh chân dung CỐ Ý không nằm ở đây: nó không nằm trên giấy tờ nên người thử
+ * hiếm khi có sẵn, và thiếu nó vẫn xác nhận được.
+ */
+export const REQUIRED_ENROLLMENT_IMAGE_KEYS = [
+  "photoFrontSideIDCard",
+  "photoBackSideIDCard",
+] as const;
+
+export type RequiredEnrollmentImageKey = (typeof REQUIRED_ENROLLMENT_IMAGE_KEYS)[number];
+
 export function enrollmentComplete(enrollment: EnrollmentFormState): boolean {
-  return REQUIRED_ENROLLMENT_KEYS.every((key) => enrollment[key].trim().length > 0);
+  return (
+    REQUIRED_ENROLLMENT_KEYS.every((key) => enrollment[key].trim().length > 0) &&
+    REQUIRED_ENROLLMENT_IMAGE_KEYS.every((key) => enrollment[key] !== null)
+  );
 }
 
 /**
@@ -409,6 +427,7 @@ export interface SignFormValidationMessages {
   mpkiCredentialRequired: string;
   signerDisplayNameRequired: string;
   enrollmentRequired: string;
+  agreementRequired: string;
   agreementNotReady: string;
 }
 
@@ -502,8 +521,15 @@ export function validateSignForm(input: {
       if (input.agreementStage === "AWAITING_CONFIRMATION") {
         problems.push(messages.agreementNotReady);
       }
-    } else if (source.requiresEnrollment !== false && !enrollmentComplete(form.enrollment)) {
-      problems.push(messages.enrollmentRequired);
+    } else if (source.requiresEnrollment !== false) {
+      // Hồ sơ điền xong KHÔNG phải là ký được. Đường duy nhất tới chứng thư là
+      // bấm đăng ký rồi xác nhận danh tính; ký thẳng lúc này để service tự đăng
+      // ký thì uuid không bao giờ về tới đây và lần sau lại đăng ký lại.
+      problems.push(
+        enrollmentComplete(form.enrollment)
+          ? messages.agreementRequired
+          : messages.enrollmentRequired,
+      );
     }
   }
 

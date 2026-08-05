@@ -5,7 +5,14 @@ import type { Dictionary } from "@/lib/i18n";
 import { useLocale } from "@/components/i18n/locale-provider";
 import { useToast } from "@/components/ui/toast";
 import { Dialog } from "@/components/ui/dialog";
-import { CheckIcon, DownloadIcon, InfoIcon } from "@/components/ui/icons";
+import {
+  CheckIcon,
+  DownloadIcon,
+  ImageUpIcon,
+  InfoIcon,
+  SpinnerIcon,
+  TrashIcon,
+} from "@/components/ui/icons";
 import type { ContentType } from "@/lib/types/domain";
 import type {
   BaselineLevel,
@@ -58,6 +65,7 @@ import {
   supportsFormat,
   supportsVisibleSignature,
   validateSignForm,
+  REQUIRED_ENROLLMENT_IMAGE_KEYS,
   REQUIRED_ENROLLMENT_KEYS,
   type AgreementStage,
   type EnrollmentFormState,
@@ -1333,9 +1341,6 @@ function SignCloudCard({
                 onChange={(value) => setEnrollment("country", value)}
               />
             </div>
-            <p className="text-[10.5px] text-fg-muted">
-              <span className="text-danger">*</span> {e.requiredLegend}
-            </p>
 
             <div className="space-y-2">
               <p className="text-[11px] font-semibold text-fg-muted">{e.photosTitle}</p>
@@ -1343,6 +1348,7 @@ function SignCloudCard({
                 <EnrollmentImageField
                   t={t}
                   id="enroll-photo-front"
+                  field="photoFrontSideIDCard"
                   label={e.photoFrontLabel}
                   value={enrollment.photoFrontSideIDCard}
                   onChange={(image) => setEnrollmentImage("photoFrontSideIDCard", image)}
@@ -1350,6 +1356,7 @@ function SignCloudCard({
                 <EnrollmentImageField
                   t={t}
                   id="enroll-photo-back"
+                  field="photoBackSideIDCard"
                   label={e.photoBackLabel}
                   value={enrollment.photoBackSideIDCard}
                   onChange={(image) => setEnrollmentImage("photoBackSideIDCard", image)}
@@ -1357,6 +1364,7 @@ function SignCloudCard({
                 <EnrollmentImageField
                   t={t}
                   id="enroll-face-image"
+                  field="faceImage"
                   label={e.faceImageLabel}
                   value={enrollment.faceImage}
                   onChange={(image) => setEnrollmentImage("faceImage", image)}
@@ -1364,6 +1372,11 @@ function SignCloudCard({
               </div>
               <p className="text-[10.5px] leading-relaxed text-fg-muted">{e.photosHint}</p>
             </div>
+
+            {/* Legend đứng sau cả hai khối vì dấu * xuất hiện ở cả hai. */}
+            <p className="text-[10.5px] text-fg-muted">
+              <span className="text-danger">*</span> {e.requiredLegend}
+            </p>
 
             <p className="text-[10.5px] leading-relaxed text-fg-muted">{e.privacyNote}</p>
 
@@ -1521,18 +1534,23 @@ function EnrollmentField({
  * Một ô ảnh của hồ sơ đăng ký: chọn tệp → base64 → xem trước.
  *
  * Ảnh KHÔNG tải lên ngay khi chọn — nó nằm trong state của form tới lúc bấm đăng
- * ký (hoặc tới bước START tự đăng ký). Bỏ trống là hợp lệ: trường vẫn được gửi
- * với chuỗi rỗng.
+ * ký (hoặc tới bước START tự đăng ký). Hai mặt CCCD là bắt buộc; ảnh chân dung
+ * bỏ trống vẫn hợp lệ và được gửi với chuỗi rỗng.
+ *
+ * Dấu bắt buộc suy ra từ `REQUIRED_ENROLLMENT_IMAGE_KEYS` chứ không đặt tay ở
+ * chỗ gọi — cùng lý do với `EnrollmentField`.
  */
 function EnrollmentImageField({
   t,
   id,
+  field,
   label,
   value,
   onChange,
 }: {
   t: Dictionary;
   id: string;
+  field: EnrollmentImageKey;
   label: string;
   value: EnrollmentImage | null;
   onChange: (image: EnrollmentImage | null) => void;
@@ -1541,6 +1559,9 @@ function EnrollmentImageField({
   const inputRef = useRef<HTMLInputElement>(null);
   const [reading, setReading] = useState(false);
   const [problem, setProblem] = useState<string>();
+  const required = (REQUIRED_ENROLLMENT_IMAGE_KEYS as readonly string[]).includes(field);
+  const missing = required && !value;
+  const pickLabel = reading ? e.imageReading : value ? e.imageReplace : e.imageChoose;
 
   async function pick(file?: File) {
     if (!file) return;
@@ -1559,9 +1580,18 @@ function EnrollmentImageField({
 
   return (
     <div>
-      <p className="mb-1 text-[10.5px] font-semibold text-fg-muted">{label}</p>
+      <p className="mb-1 text-[10.5px] font-semibold text-fg-muted">
+        {label}
+        {required ? (
+          <span aria-hidden="true" className="ml-0.5 text-danger">
+            *
+          </span>
+        ) : null}
+      </p>
 
-      <div className="rounded-md border border-border bg-surface p-2">
+      <div
+        className={`rounded-md border bg-surface p-2 ${missing ? "border-warning" : "border-border"}`}
+      >
         {value ? (
           <>
             {/* Ảnh cục bộ dạng data URL — next/image không phục vụ được gì ở đây. */}
@@ -1582,14 +1612,25 @@ function EnrollmentImageField({
           </div>
         )}
 
+        {/*
+          Ba ô ảnh nằm cạnh nhau trong một cột hẹp, nên nhãn chữ ("Đổi ảnh",
+          "Xoá ảnh") tràn ra khỏi nút. Chỉ hiện icon; tên đọc được vẫn còn
+          nguyên ở `aria-label`, và `title` cho chuột.
+        */}
         <div className="mt-2 flex gap-1.5">
           <button
             type="button"
             onClick={() => inputRef.current?.click()}
             disabled={reading}
-            className="h-7 flex-1 rounded-md border border-border bg-surface text-[10.5px] font-semibold text-fg disabled:opacity-50"
+            aria-label={pickLabel}
+            title={pickLabel}
+            className="flex h-7 flex-1 items-center justify-center rounded-md border border-border bg-surface text-fg disabled:opacity-50"
           >
-            {reading ? e.imageReading : value ? e.imageReplace : e.imageChoose}
+            {reading ? (
+              <SpinnerIcon size={13} className="animate-spin" />
+            ) : (
+              <ImageUpIcon size={13} />
+            )}
           </button>
           {value ? (
             <button
@@ -1598,9 +1639,11 @@ function EnrollmentImageField({
                 setProblem(undefined);
                 onChange(null);
               }}
-              className="h-7 rounded-md border border-border bg-surface px-2 text-[10.5px] font-semibold text-fg"
+              aria-label={e.imageRemove}
+              title={e.imageRemove}
+              className="flex h-7 w-9 items-center justify-center rounded-md border border-border bg-surface text-fg"
             >
-              {e.imageRemove}
+              <TrashIcon size={13} />
             </button>
           ) : null}
         </div>

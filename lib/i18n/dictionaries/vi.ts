@@ -476,11 +476,11 @@ export const vi: Dictionary = {
       photoBackLabel: "CCCD mặt sau",
       faceImageLabel: "Ảnh chân dung",
       photosHint:
-        "Không bắt buộc — bỏ trống thì trường vẫn được gửi với giá trị rỗng. Ảnh được chuyển sang base64 ngay tại trình duyệt; ảnh lớn hơn 2 MB sẽ tự thu nhỏ trước khi gửi.",
+        "Hai mặt CCCD là bắt buộc — thiếu thì hồ sơ không qua được bước xác nhận danh tính. Ảnh chân dung không bắt buộc, bỏ trống vẫn được gửi với giá trị rỗng. Ảnh được chuyển sang base64 ngay tại trình duyệt; ảnh lớn hơn 2 MB sẽ tự thu nhỏ trước khi gửi.",
       imageEmpty: "Chưa có ảnh",
       imageChoose: "Chọn ảnh",
       imageReplace: "Đổi ảnh",
-      imageRemove: "Xoá",
+      imageRemove: "Xoá ảnh",
       imageReading: "Đang xử lý…",
       imageProblem: {
         NOT_IMAGE: "Tệp này không phải ảnh.",
@@ -489,7 +489,8 @@ export const vi: Dictionary = {
       },
       privacyNote: "Dữ liệu cá nhân — gửi thẳng cho CA, trang này không lưu lại.",
       requiredLegend: "Trường bắt buộc",
-      requiredMissing: "Điền đủ họ tên, số CCCD, số điện thoại và email để đăng ký được.",
+      requiredMissing:
+        "Điền đủ họ tên, số CCCD, số điện thoại, email và ảnh hai mặt CCCD để đăng ký được.",
       enroll: "Đăng ký và lấy agreementUuid",
       enrolling: "Đang đăng ký…",
       enrollDone: "Đã tạo đăng ký",
@@ -663,7 +664,9 @@ export const vi: Dictionary = {
       mpkiCredentialRequired: "Chọn credential dùng để ký.",
       signerDisplayNameRequired: "eSign Cloud bắt buộc có tên người ký.",
       enrollmentRequired:
-        "Chưa có agreementUuid thì phần đăng ký cần ít nhất họ tên, số CCCD, số điện thoại và email.",
+        "Chưa có agreementUuid thì phần đăng ký cần họ tên, số CCCD, số điện thoại, email và ảnh hai mặt CCCD.",
+      agreementRequired:
+        "Hồ sơ đã điền xong nhưng chưa có chứng thư. Bấm “Đăng ký và lấy agreementUuid”, xác nhận danh tính, tới khi trạng thái READY thì mới ký được.",
       agreementNotReady:
         "Đăng ký vừa tạo chưa được xác nhận danh tính. Mở trang xác nhận ở khối eSign Cloud, xong rồi mới ký được.",
     },

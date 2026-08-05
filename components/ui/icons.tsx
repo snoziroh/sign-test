@@ -205,3 +205,36 @@ export function DownloadIcon(props: IconProps) {
     </svg>
   );
 }
+
+export function ImageUpIcon(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7" />
+      <path d="m3 17 5-5c.9-.9 2.1-.9 3 0l4 4" />
+      <circle cx="9" cy="8.5" r="1.5" />
+      <path d="M18 9V3" />
+      <path d="m15 6 3-3 3 3" />
+    </svg>
+  );
+}
+
+export function TrashIcon(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M3 6h18" />
+      <path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2" />
+      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
+      <path d="M10 11v6" />
+      <path d="M14 11v6" />
+    </svg>
+  );
+}
+
+/** Dùng kèm `animate-spin` — vòng cung hở mới thấy được là nó đang quay. */
+export function SpinnerIcon(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M21 12a9 9 0 1 1-6.22-8.56" />
+    </svg>
+  );
+}

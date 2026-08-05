@@ -474,11 +474,11 @@ export const en = {
       photoBackLabel: "ID card, back",
       faceImageLabel: "Portrait photo",
       photosHint:
-        "Optional — left empty, the fields are still sent with an empty value. Images are converted to base64 in the browser; anything over 2 MB is downscaled before it is sent.",
+        "Both sides of the ID card are required — without them the enrollment never passes identity confirmation. The portrait is optional and is still sent with an empty value. Images are converted to base64 in the browser; anything over 2 MB is downscaled before it is sent.",
       imageEmpty: "No image yet",
       imageChoose: "Choose image",
-      imageReplace: "Replace",
-      imageRemove: "Remove",
+      imageReplace: "Replace image",
+      imageRemove: "Remove image",
       imageReading: "Processing…",
       imageProblem: {
         NOT_IMAGE: "That file is not an image.",
@@ -487,7 +487,8 @@ export const en = {
       },
       privacyNote: "Personal data — sent straight to the CA, never stored by this page.",
       requiredLegend: "Required field",
-      requiredMissing: "Fill in the full name, citizen ID, mobile number and email to enroll.",
+      requiredMissing:
+        "Fill in the full name, citizen ID, mobile number, email and both sides of the ID card to enroll.",
       enroll: "Enroll and get agreementUuid",
       enrolling: "Enrolling…",
       enrollDone: "Enrollment created",
@@ -661,7 +662,9 @@ export const en = {
       mpkiCredentialRequired: "Choose which credential to sign with.",
       signerDisplayNameRequired: "eSign Cloud requires a signer display name.",
       enrollmentRequired:
-        "Without an agreementUuid, enrollment needs at least the full name, citizen ID, mobile number and email.",
+        "Without an agreementUuid, enrollment needs the full name, citizen ID, mobile number, email and both sides of the ID card.",
+      agreementRequired:
+        "The enrollment form is filled in but no certificate exists yet. Press “Enroll and get agreementUuid”, confirm the identity, and sign once the status is READY.",
       agreementNotReady:
         "The enrollment you just created has not been confirmed yet. Open the identity confirmation page in the eSign Cloud card, then sign.",
     },
