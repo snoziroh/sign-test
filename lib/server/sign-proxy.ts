@@ -41,7 +41,7 @@ export const SIGN_WAIT_TIMEOUT_MS = 345_000;
 const FORWARDED_RESPONSE_HEADERS = ["retry-after", "x-correlation-id"] as const;
 
 /** Dịch vụ ký không tiếp cận được: backend tắt, DNS/TCP lỗi, hoặc timeout. */
-class SigningApiUnavailableError extends Error {
+export class SigningApiUnavailableError extends Error {
   constructor(cause?: unknown) {
     super("SIGNING_API_UNAVAILABLE");
     this.name = "SigningApiUnavailableError";
@@ -49,14 +49,14 @@ class SigningApiUnavailableError extends Error {
   }
 }
 
-class SigningApiNotConfiguredError extends Error {
+export class SigningApiNotConfiguredError extends Error {
   constructor() {
     super("SIGNING_API_NOT_CONFIGURED");
     this.name = "SigningApiNotConfiguredError";
   }
 }
 
-class SigningApiBaseUrlInvalidError extends Error {
+export class SigningApiBaseUrlInvalidError extends Error {
   constructor() {
     super("SIGNING_API_BASE_URL_INVALID");
     this.name = "SigningApiBaseUrlInvalidError";

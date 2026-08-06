@@ -19,8 +19,8 @@ const plexMono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Sign Test",
-  description: "Bàn thử chức năng ký — một màn duy nhất, gọi thẳng dịch vụ ký.",
+  title: "FIS CA Signing Tool",
+  description: "Công cụ hỗ trợ ký của FIS CA",
   icons: {
     icon: [{ url: "/favicon.svg", type: "image/svg+xml" }],
   },

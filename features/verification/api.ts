@@ -1,15 +1,27 @@
 "use client";
 
 import type { VerificationReport } from "@/lib/types/verification";
-import { baseUrlHeaders } from "@/features/signing/api-base-url";
+import { verifyBaseUrlHeaders } from "@/features/verification/verify-base-url";
 
 /**
  * Client của luồng verify. Cùng quy ước với `features/signing/sign-api.ts`: mọi
- * lời gọi đi qua route `/api/signing/*` của chính ứng dụng này, kèm header
- * `X-Signing-Base-Url` để proxy biết gọi môi trường nào.
+ * lời gọi đi qua route `/api/verify/*` của chính ứng dụng này, kèm header
+ * `X-Verify-Base-Url` để proxy biết gọi môi trường nào.
+ *
+ * Địa chỉ ở đây là của **verification-service** (`POST /api/v1/verify`), không
+ * phải của dịch vụ ký — hai service, hai ô cấu hình.
  */
 
-const MAX_FILE_SIZE = 32 * 1024 * 1024; // 32 MB — giới hạn mặc định của backend
+const MAX_FILE_SIZE = 32 * 1024 * 1024; // 32 MiB — VERIFICATION_MAX_FILE_SIZE mặc định
+
+/**
+ * Mã tra cứu gửi kèm mọi lời gọi verify. Backend echo lại nguyên văn, nên đây là
+ * sợi dây duy nhất nối log hai bên khi cần báo lỗi. Định dạng phải khớp
+ * `[A-Za-z0-9._-]{8,128}` — `crypto.randomUUID()` nằm gọn trong đó.
+ */
+function newCorrelationId(): string {
+  return `sigil-${crypto.randomUUID()}`;
+}
 
 export class VerifyApiClientError extends Error {
   constructor(
@@ -45,7 +57,7 @@ async function parse<T>(response: Response): Promise<T> {
       response.status,
       errorBody.code ?? "UNKNOWN_ERROR",
       errorBody.detail,
-      errorBody.correlationId,
+      errorBody.correlationId ?? response.headers.get("x-correlation-id"),
     );
   }
 
@@ -55,6 +67,10 @@ async function parse<T>(response: Response): Promise<T> {
 /**
  * Verify file gửi trực tiếp. Không sinh artifact và không lưu gì lại — file chỉ
  * tồn tại trong vòng đời của request này.
+ *
+ * Kết quả trả về LUÔN là một báo cáo, kể cả khi chữ ký hỏng hoàn toàn: chữ ký sai
+ * không phải lỗi HTTP. Verdict nằm ở `report.status` / `report.mainIndication` —
+ * đừng dùng việc hàm này không ném lỗi để kết luận "hợp lệ".
  */
 export async function verifyFile(file: File): Promise<VerificationReport> {
   if (file.size > MAX_FILE_SIZE) {
@@ -64,9 +80,9 @@ export async function verifyFile(file: File): Promise<VerificationReport> {
   const form = new FormData();
   form.append("file", file);
 
-  const response = await fetch("/api/signing/signatures/validate", {
+  const response = await fetch("/api/verify", {
     method: "POST",
-    headers: baseUrlHeaders(),
+    headers: { "X-Correlation-Id": newCorrelationId(), ...verifyBaseUrlHeaders() },
     body: form,
   });
 
@@ -74,13 +90,28 @@ export async function verifyFile(file: File): Promise<VerificationReport> {
 }
 
 /**
+ * Thăm dò một địa chỉ verify — dùng cho nút *Kiểm tra kết nối* trước khi lưu.
+ * Không gửi file nào lên, nên không tốn một lượt thẩm định.
+ */
+export async function probeVerifyService(
+  baseUrlOverride?: string,
+): Promise<{ baseUrl: string; status: number }> {
+  const response = await fetch("/api/verify", {
+    method: "GET",
+    headers: verifyBaseUrlHeaders(baseUrlOverride),
+  });
+
+  return parse<{ baseUrl: string; status: number }>(response);
+}
+
+/**
  * Thêm host OCSP/CRL vào allowlist thu hồi. `409 ALLOWLIST_ENTRY_EXISTS` nghĩa là
  * host đã sẵn sàng — kết quả mong muốn đã đạt, không phải lỗi chặn luồng.
  */
 export async function addToAllowlist(host: string): Promise<void> {
-  const response = await fetch("/api/signing/revocation-allowlist", {
+  const response = await fetch("/api/verify/revocation-allowlist", {
     method: "POST",
-    headers: { "Content-Type": "application/json", ...baseUrlHeaders() },
+    headers: { "Content-Type": "application/json", ...verifyBaseUrlHeaders() },
     body: JSON.stringify({ host, note: "Thêm từ cảnh báo verify" }),
   });
 
@@ -91,7 +122,7 @@ export async function addToAllowlist(host: string): Promise<void> {
     response.status,
     body.code ?? "UNKNOWN_ERROR",
     body.detail,
-    body.correlationId,
+    body.correlationId ?? response.headers.get("x-correlation-id"),
   );
 }
 
@@ -107,33 +138,34 @@ export async function addToAllowlistAndReverify(
 const VERIFY_ERROR_MESSAGES: Record<string, string> = {
   /* Lớp proxy của bàn thử này — không phải mã của backend. */
   VERIFY_NOT_SUPPORTED:
-    "Dịch vụ ở địa chỉ này không có endpoint verify (POST /api/v2/signatures/validate). Đây là service chỉ ký — trỏ địa chỉ API sang service có verify.",
+    "Dịch vụ ở địa chỉ này không có endpoint verify (POST /api/v1/verify). Kiểm tra lại địa chỉ dịch vụ verify — dịch vụ ký không thẩm định được.",
   ALLOWLIST_NOT_SUPPORTED:
     "Dịch vụ ở địa chỉ này không có endpoint allowlist thu hồi (POST /api/v1/revocation-allowlist).",
-  SIGNING_API_UNREACHABLE:
-    "Không kết nối được tới dịch vụ verify. Kiểm tra lại địa chỉ API và xem service đã chạy chưa.",
-  SIGNING_API_NOT_CONFIGURED:
-    "Chưa có địa chỉ dịch vụ. Đặt địa chỉ API ở nút cấu hình phía trên, hoặc đặt SIGNING_API_URL trong .env.local.",
-  SIGNING_API_BASE_URL_INVALID:
-    "Địa chỉ API không hợp lệ. Phải là URL http:// hoặc https:// đầy đủ, ví dụ http://localhost:8080.",
+  VERIFY_API_UNREACHABLE:
+    "Không kết nối được tới dịch vụ verify. Kiểm tra lại địa chỉ và xem service đã chạy chưa.",
+  VERIFY_API_NOT_CONFIGURED:
+    "Chưa có địa chỉ dịch vụ verify. Đặt địa chỉ ở nút cấu hình phía trên, hoặc đặt VERIFY_API_URL trong .env.local.",
+  VERIFY_API_BASE_URL_INVALID:
+    "Địa chỉ dịch vụ verify không hợp lệ. Phải là URL http:// hoặc https:// đầy đủ, ví dụ http://localhost:8082.",
   VERIFY_SCHEMA_UNSUPPORTED:
-    "Backend trả báo cáo verify theo schema mà bàn thử này chưa đọc được. Cần cập nhật lại bộ chuyển đổi.",
+    "Backend trả báo cáo verify theo schema mà bàn thử này chưa đọc được (đang hỗ trợ schema 5.x). Cần cập nhật lại bộ chuyển đổi trong lib/types/verification.ts.",
 
-  /* Mã của backend */
+  /*
+   * Mã của backend. Danh sách đầy đủ của verification-service chỉ có năm mã dưới
+   * đây — mọi thứ khác đi qua nhánh fallback bên dưới và hiện nguyên văn.
+   */
   FILE_EMPTY: "File rỗng.",
   FILE_READ_FAILED: "Không đọc được file đã tải lên. Vui lòng thử lại.",
-  ACCESS_DENIED: "Bạn không có quyền verify tệp này.",
-  FILE_TOO_LARGE: "File vượt quá giới hạn 32 MB.",
-  ARTIFACT_TYPE_NOT_SUPPORTED:
-    "Định dạng file không được hỗ trợ (chỉ nhận PDF, XML, DOCX, XLSX, PPTX).",
-  ARTIFACT_MAGIC_BYTES_INVALID: "Nội dung file không đúng với phần mở rộng.",
-  CONTENT_TYPE_UNSUPPORTED: "Định dạng này chưa hỗ trợ verify.",
-  ARTIFACT_UNREADABLE: "Không đọc được nội dung file để verify.",
+  VALIDATION_FAILED: "Yêu cầu verify không hợp lệ.",
+  FILE_TOO_LARGE: "File vượt quá giới hạn 32 MiB.",
+  INTERNAL_ERROR: "Dịch vụ verify gặp lỗi nội bộ khi xử lý file này.",
+
+  /* Mã của endpoint allowlist thu hồi — cùng service, khác đường. */
   ALLOWLIST_HOST_EMPTY: "Không xác định được host để thêm vào allowlist.",
 };
 
 export function describeVerifyError(code: string, detail?: string): string {
   const known = VERIFY_ERROR_MESSAGES[code];
-  if (known) return known;
+  if (known) return detail ? `${known} (${detail})` : known;
   return detail ? `${code} — ${detail}` : `Đã xảy ra lỗi không xác định khi verify (${code}).`;
 }

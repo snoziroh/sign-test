@@ -16,6 +16,7 @@ export function ScreenNav() {
 
   const items = [
     { href: "/", label: t.routes.sign.label },
+    { href: "/sign-request", label: t.routes.signRequest.label },
     { href: "/verify", label: t.routes.verify.label },
   ];
 
