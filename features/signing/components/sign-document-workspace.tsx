@@ -1,15 +1,18 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Dictionary } from "@/lib/i18n";
 import { useLocale } from "@/components/i18n/locale-provider";
 import { useToast } from "@/components/ui/toast";
 import { Dialog } from "@/components/ui/dialog";
 import {
+  ArrowLeftIcon,
+  ArrowRightIcon,
   CheckIcon,
   DownloadIcon,
   ImageUpIcon,
   InfoIcon,
+  RotateCcwIcon,
   SpinnerIcon,
   TrashIcon,
 } from "@/components/ui/icons";
@@ -26,13 +29,21 @@ import type {
   UsbTokenJobRequest,
 } from "@/lib/types/signing";
 import {
-  algorithmLabel,
   detectContentType,
   detectDocumentFormat,
   formatBytes,
   readTargetSignatures,
   type TargetSignature,
 } from "../document-format";
+import {
+  algorithmLabel,
+  algorithmsFor,
+  buildAlgorithmCatalog,
+  groupAlgorithms,
+  reselectAlgorithm,
+  requiresEcKey,
+  type AlgorithmCatalog,
+} from "../signature-algorithm";
 import { errorMessage } from "../api";
 import { useApiBaseUrl } from "../api-base-url";
 import {
@@ -51,6 +62,7 @@ import {
 } from "../enrollment-image";
 import {
   buildContinueRequest,
+  buildSignSteps,
   buildStartRequest,
   buildUsbTokenJobRequest,
   enrollmentComplete,
@@ -72,6 +84,7 @@ import {
   type EnrollmentImageKey,
   type SignAppearanceGeometry,
   type SignFormState,
+  type SignStepId,
 } from "../sign-configuration";
 import {
   clearAgreementUuid,
@@ -96,6 +109,7 @@ import {
 } from "../usb-token-agent";
 import { mergeUsbTokenSource } from "../usb-token-source";
 import { SignSessionDialog } from "./sign-session-dialog";
+import { SignStepProgress, type SignStepView } from "./sign-step-progress";
 import { UsbTokenSignDialog } from "./usb-token-sign-dialog";
 import { WarningBlock } from "./sign-dialog-parts";
 
@@ -103,7 +117,15 @@ import { WarningBlock } from "./sign-dialog-parts";
  * Màn ký một tài liệu, chạy trên `POST /api/v1/sign`.
  *
  * Trình tự: `GET /capabilities` → chọn tài liệu → chọn nguồn chữ ký → điền phần
- * riêng của nguồn → `POST /sign` bước START. Từ đây có ba kết cục, và chúng do
+ * riêng của nguồn → `POST /sign` bước START.
+ *
+ * Trình tự đó cũng chính là thứ người dùng thấy: khối cấu hình đi từng bước một
+ * (`buildSignSteps`), mỗi lần chỉ hiện thẻ của bước đang đứng. Không phải để cho
+ * gọn — mỗi bước quyết định nội dung của bước sau (định dạng lọc nguồn, nguồn lọc
+ * thuật toán), nên bày hết ra từ đầu là mời người dùng điền những ô sẽ bị dựng
+ * lại. Bước đã xong vẫn quay lại được bằng thanh tiến trình.
+ *
+ * Từ bước START có ba kết cục, và chúng do
  * `interactionModel` của nguồn quyết định chứ không do màn hình đoán:
  *
  * - `NONE` (PKCS#12) — ký xong ngay trong response.
@@ -143,6 +165,13 @@ export function SignDocumentWorkspace() {
   const inputRef = useRef<HTMLInputElement>(null);
   const p12InputRef = useRef<HTMLInputElement>(null);
   const abortRef = useRef<AbortController>(undefined);
+  /**
+   * Định dạng tệp đang chọn, đọc được từ `loadCapabilities` mà không phải đưa
+   * nó vào deps — đưa vào là mỗi lần đổi tệp lại gọi lại `/capabilities`.
+   * Có lệch một nhịp cũng không sai: effect chọn lại thuật toán ở dưới chạy sau
+   * và sửa nốt.
+   */
+  const formatRef = useRef<DocumentFormat | undefined>(undefined);
 
   const [capabilities, setCapabilities] = useState<SignCapabilities>();
   const [capabilitiesLoading, setCapabilitiesLoading] = useState(true);
@@ -162,6 +191,13 @@ export function SignDocumentWorkspace() {
   const [position, setPosition] = useState<SignaturePosition>(DEFAULT_SIGNATURE_POSITION);
   const [pdfPageSize, setPdfPageSize] = useState<PdfPageMetrics>();
 
+  /**
+   * Bước người dùng ĐANG YÊU CẦU xem, không nhất thiết là bước đang hiện: nó còn
+   * bị kẹp lại theo `furthestReachable` mỗi lần render. Xoá tệp đang chọn không
+   * cần đẩy state này về đầu — bước 1 chưa xong thì mọi bước sau tự khoá.
+   */
+  const [activeStep, setActiveStep] = useState<SignStepId>("document");
+
   const [flow, setFlow] = useState<FlowState>({ phase: "idle" });
   const [dialog, setDialog] = useState<DialogState>();
   const [usbDialog, setUsbDialog] = useState<UsbTokenDialogState>();
@@ -178,6 +214,11 @@ export function SignDocumentWorkspace() {
   const contentType: ContentType | undefined = file ? detectContentType(file) : undefined;
   const documentFormat: DocumentFormat | undefined = file ? detectDocumentFormat(file) : undefined;
   const source = findSource(capabilities?.sources ?? [], form?.sourceId);
+  /**
+   * Nhãn thuật toán do backend đặt. Dựng một lần cho mỗi lần tải capability —
+   * nó đi xuống hộp thoại USB Token nên phải ổn định giữa các lần render.
+   */
+  const catalog = useMemo(() => buildAlgorithmCatalog(capabilities), [capabilities]);
 
   /**
    * Capability tải lại mỗi khi đổi baseUrl: hai môi trường có thể bật các nguồn
@@ -195,7 +236,7 @@ export function SignDocumentWorkspace() {
       setForm((current) => {
         const preferred =
           findSource(next.sources, current?.sourceId) ?? next.sources[0];
-        return preferred ? resolveFormState(preferred, current) : undefined;
+        return preferred ? resolveFormState(preferred, current, formatRef.current) : undefined;
       });
     } catch (error) {
       setCapabilities(undefined);
@@ -211,6 +252,30 @@ export function SignDocumentWorkspace() {
     void loadCapabilities();
   }, [loadCapabilities, baseUrl]);
 
+  /**
+   * Đổi tệp sang định dạng khác thì phải CHỌN LẠI thuật toán.
+   *
+   * Đây không phải chuyện gọn gàng: cùng một nguồn PKCS12, PDF ký được cả 9
+   * thuật toán còn DOCX chỉ 3 × PKCS#1. Giữ nguyên `RSA_PSS_SHA256` khi người
+   * dùng đổi từ PDF sang DOCX là để nút Ký gửi lên một tổ hợp chắc chắn trả
+   * `422 ALGORITHM_NOT_SUPPORTED`.
+   *
+   * Chỉ đụng vào khi lựa chọn hiện tại thật sự hết hợp lệ — `reselectAlgorithm`
+   * trả `undefined` ở mọi trường hợp khác, nên thao tác của người dùng không bị
+   * ghi đè sau mỗi lần render.
+   */
+  useEffect(() => {
+    formatRef.current = documentFormat;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- đồng bộ lựa chọn thuật toán với ràng buộc của định dạng vừa đổi; chỉ chạy khi lựa chọn hiện tại đã hết hợp lệ
+    setForm((current) => {
+      if (!current) return current;
+      const active = findSource(capabilities?.sources ?? [], current.sourceId);
+      if (!active) return current;
+      const next = reselectAlgorithm(active, documentFormat, current.algorithm);
+      return next ? { ...current, algorithm: next } : current;
+    });
+  }, [documentFormat, capabilities]);
+
   // Phiên eSign Cloud còn sống sau khi tải lại trang: đề nghị nối lại thay vì
   // ký lại từ đầu — bước START đã bị tính phí rồi.
   useEffect(() => {
@@ -225,6 +290,19 @@ export function SignDocumentWorkspace() {
     // Huỷ lệnh ký đang treo khi rời màn hình — đọc ref lúc unmount là cố ý.
     return () => abortRef.current?.abort();
   }, []);
+
+  /**
+   * Ký xong thì bản xem trước chuyển sang chính TỆP ĐÃ KÝ: người dùng vừa bỏ ra
+   * một lượt ký, thứ họ muốn nhìn là kết quả — còn khung kéo thả trên bản gốc
+   * lúc này chỉ mời họ sửa một toạ độ không còn tác dụng gì nữa.
+   *
+   * `useMemo` là bắt buộc chứ không phải tối ưu: `signedDocumentAsFile` giải
+   * base64 và dựng một `File` MỚI mỗi lần gọi, mà `PdfPreview` lại nạp lại tài
+   * liệu theo tham chiếu `file`.
+   */
+  const signedFile = useMemo(() => (signed ? signedDocumentAsFile(signed) : undefined), [signed]);
+  const previewFile = signedFile ?? file;
+  const previewContentType = signedFile ? detectContentType(signedFile) : contentType;
 
   const appearanceSupported = supportsVisibleSignature(source, documentFormat);
   const geometry = buildGeometry(appearanceSupported, form, position, pdfPageSize);
@@ -243,6 +321,20 @@ export function SignDocumentWorkspace() {
   const busy = flow.phase === "signing";
   const canSign = validation.valid && !busy;
 
+  /*
+   * Trạng thái từng bước được TÍNH LẠI mỗi render từ chính `validation` đang
+   * điều khiển nút ký — không có cờ "đã hoàn tất" nào được nhớ riêng. Nhờ vậy
+   * sửa ngược một ô ở bước trước (đổi tệp sang định dạng nguồn không ký được)
+   * lập tức khoá lại các bước sau, thay vì để người dùng đi tiếp tới nút ký rồi
+   * mới biết.
+   */
+  const steps = buildSignSteps(source);
+  const stepViews = buildStepViews(steps, validation.byStep, flow.phase === "completed");
+  const furthest = furthestReachable(stepViews);
+  const requestedIndex = steps.indexOf(activeStep);
+  const activeIndex = Math.min(requestedIndex < 0 ? furthest : requestedIndex, furthest);
+  const currentStep = steps[activeIndex];
+
   /* ---------------------------------------------------------------- *
    * Tài liệu
    * ---------------------------------------------------------------- */
@@ -255,6 +347,9 @@ export function SignDocumentWorkspace() {
     setPdfPageSize(undefined);
     // Chữ ký đích thuộc về đúng file này — bỏ lựa chọn cũ trước khi quét lại.
     setForm((current) => (current ? { ...current, targetSignatureId: "" } : current));
+    // Chọn xong tệp là biết được nguồn nào ký được định dạng đó — đi thẳng tới
+    // bước chọn nguồn thay vì bắt bấm "Tiếp tục" cho một bước đã xong.
+    setActiveStep("source");
 
     setScanningTargets(true);
     try {
@@ -272,12 +367,61 @@ export function SignDocumentWorkspace() {
     void openDocument(selected);
   }
 
+  /**
+   * Về đúng trạng thái của lần đầu mở trang: bỏ tài liệu, bỏ tệp khoá, và dựng
+   * lại form từ mặc định của capability thay vì giữ lựa chọn cũ.
+   *
+   * HAI thứ cố ý KHÔNG bị xoá, vì lúc mới vào trang chúng cũng không rỗng:
+   *
+   * - `capabilities` — vẫn là của đúng dịch vụ đang chọn. Gọi lại `/capabilities`
+   *   chỉ để nhận về cùng một câu trả lời là một vòng loading thừa.
+   * - `agreementUuid` trong localStorage — nó được nạp lại lúc mount, và đó là
+   *   thứ duy nhất giữ cho lần ký sau khỏi phải đăng ký lại một giao dịch có
+   *   tính phí ở FPT. Xoá nó ở đây là ném đi tiền của người dùng.
+   *
+   * Tệp đã ký thì biến mất thật — nó chỉ sống trong bộ nhớ trang, nên dòng ghi
+   * chú dưới nút nói rõ phải tải về trước.
+   */
+  function restartFlow() {
+    setFile(undefined);
+    setTargets([]);
+    setScanningTargets(false);
+    setDragging(false);
+    setP12File(undefined);
+    setCredentials([]);
+    setCredentialsError(undefined);
+    setCredentialsLoading(false);
+    setPosition(DEFAULT_SIGNATURE_POSITION);
+    setPdfPageSize(undefined);
+    setSigned(undefined);
+    setFlow({ phase: "idle" });
+    setResultOpen(false);
+    setAgreementStage("UNKNOWN");
+    setActiveStep("document");
+    // Không có tệp thì cũng không có định dạng — cùng nhịp với lúc mount.
+    formatRef.current = undefined;
+    // Chọn lại đúng tệp vừa bỏ ra vẫn phải kích hoạt `onChange`.
+    if (inputRef.current) inputRef.current.value = "";
+    if (p12InputRef.current) p12InputRef.current.value = "";
+
+    // Cùng trình tự với lúc mount: dựng form từ nguồn đầu tiên KHÔNG mang theo
+    // `previous`, rồi nhận lại agreementUuid đã lưu.
+    setForm(() => {
+      const preferred = capabilities?.sources[0];
+      if (!preferred) return undefined;
+      const next = resolveFormState(preferred, undefined, undefined);
+      const stored = loadAgreementUuid();
+      return stored ? { ...next, agreementUuid: stored } : next;
+    });
+  }
+
   function removeFile() {
     setFile(undefined);
     setTargets([]);
     setSigned(undefined);
     setFlow({ phase: "idle" });
     setPdfPageSize(undefined);
+    setActiveStep("document");
     if (inputRef.current) inputRef.current.value = "";
   }
 
@@ -288,7 +432,7 @@ export function SignDocumentWorkspace() {
   function changeSource(sourceId: string) {
     const next = findSource(capabilities?.sources ?? [], sourceId);
     if (!next) return;
-    setForm((current) => resolveFormState(next, current));
+    setForm((current) => resolveFormState(next, current, documentFormat));
     setFlow({ phase: "idle" });
   }
 
@@ -448,56 +592,51 @@ export function SignDocumentWorkspace() {
       ) : null}
 
       {/*
-        Màn hẹp: một cột, đúng thứ tự thao tác — chọn tệp → xem trước → cấu hình.
-        Đó cũng là thứ tự DOM, nên không cần đặt lại gì.
+        Thanh tiến trình chiếm trọn bề ngang, đứng trên CẢ hai cột: nó nói về
+        toàn bộ màn hình chứ không riêng khối cấu hình, và bản xem trước bên trái
+        cũng đổi theo bước (chỉ có gì để xem sau bước 1).
 
-        Từ `xl`: hai cột. Cột trái CHỈ có bản xem trước và ăn hết phần còn lại của
-        chiều ngang — khung ký được kéo thả trên chính trang PDF nên trang càng to
-        toạ độ càng đặt được chính xác. Cột phải giữ nguyên bề rộng cũ với khối
-        chọn tệp lên đầu, rồi tới cấu hình.
+        Màn hẹp: một cột, thứ tự DOM là tiến trình → cấu hình → xem trước. Khối
+        cấu hình lên trước vì nó là nơi thao tác; bản xem trước chỉ để đối chiếu.
 
-        Vị trí đặt bằng `col-start`/`row-start` chứ không bằng thứ tự DOM: gom
-        chọn tệp và cấu hình vào một thẻ bọc thì cột phải dựng nhanh hơn, nhưng
-        màn hẹp sẽ đẩy bản xem trước xuống dưới cả hai. `row-span-2` để bản xem
-        trước cao hơn khối chọn tệp không đẩy khối cấu hình tụt xuống.
+        Từ `xl`: hai cột, đặt bằng `col-start`/`row-start` chứ không bằng thứ tự
+        DOM. Cột trái CHỈ có bản xem trước và ăn hết phần còn lại của chiều ngang
+        — khung ký được kéo thả trên chính trang PDF nên trang càng to toạ độ
+        càng đặt được chính xác.
       */}
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px] xl:items-start">
-        <div className="xl:col-start-2 xl:row-start-1">
-          <DocumentPanel
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_380px] xl:items-start">
+        <div className="xl:col-span-2 xl:col-start-1 xl:row-start-1">
+          <SignStepProgress
             t={t}
-            file={file}
-            format={contentType}
-            documentFormat={documentFormat}
-            dragging={dragging}
-            inputRef={inputRef}
-            onDraggingChange={setDragging}
-            onSelectFile={selectFile}
-            onRemoveFile={removeFile}
-          />
-        </div>
-
-        <div className="xl:col-start-1 xl:row-start-1 xl:row-span-2">
-          <DocumentPreview
-            t={t}
-            file={file}
-            format={contentType}
-            visibleSignature={appearanceSupported && Boolean(form?.visibleSignature)}
-            signaturePosition={position}
-            onSignaturePositionChange={setPosition}
-            onPageMetrics={setPdfPageSize}
+            steps={stepViews}
+            activeIndex={activeIndex}
+            onSelect={setActiveStep}
           />
         </div>
 
         <div className="xl:col-start-2 xl:row-start-2">
           <ConfigurationPanel
             t={t}
+            step={currentStep}
+            stepComplete={stepViews[activeIndex]?.complete ?? false}
+            previousStep={steps[activeIndex - 1]}
+            nextStep={steps[activeIndex + 1]}
+            onStepChange={setActiveStep}
             capabilities={capabilities}
+            catalog={catalog}
             capabilitiesLoading={capabilitiesLoading}
             capabilitiesError={capabilitiesError}
             onReloadCapabilities={loadCapabilities}
             source={source}
             form={form}
+            file={file}
+            contentType={contentType}
             documentFormat={documentFormat}
+            dragging={dragging}
+            documentInputRef={inputRef}
+            onDraggingChange={setDragging}
+            onSelectFile={selectFile}
+            onRemoveFile={removeFile}
             targets={targets}
             scanningTargets={scanningTargets}
             p12File={p12File}
@@ -507,7 +646,8 @@ export function SignDocumentWorkspace() {
             credentialsLoading={credentialsLoading}
             credentialsError={credentialsError}
             onLoadCredentials={loadCredentials}
-            blockers={validation.messages}
+            blockers={validation.byStep[currentStep] ?? []}
+            appearanceSupported={appearanceSupported}
             flow={flow}
             canSign={canSign}
             agreementStage={agreementStage}
@@ -516,6 +656,22 @@ export function SignDocumentWorkspace() {
             onUpdate={update}
             onSign={startSign}
             onShowResult={() => setResultOpen(true)}
+            onRestart={restartFlow}
+          />
+        </div>
+
+        <div className="xl:col-start-1 xl:row-start-2">
+          <DocumentPreview
+            t={t}
+            file={previewFile}
+            format={previewContentType}
+            signed={Boolean(signedFile)}
+            visibleSignature={
+              !signedFile && appearanceSupported && Boolean(form?.visibleSignature)
+            }
+            signaturePosition={position}
+            onSignaturePositionChange={setPosition}
+            onPageMetrics={setPdfPageSize}
           />
         </div>
       </div>
@@ -548,6 +704,7 @@ export function SignDocumentWorkspace() {
           sourceName={sourceLabel(usbDialog.source)}
           file={usbDialog.file}
           request={usbDialog.request}
+          catalog={catalog}
           onCompleted={applyCompleted}
           onClose={() => setUsbDialog(undefined)}
         />
@@ -559,6 +716,7 @@ export function SignDocumentWorkspace() {
         document={signed}
         source={source}
         form={form}
+        catalog={catalog}
         onClose={() => setResultOpen(false)}
         onSignAgain={() => {
           if (!signed) return;
@@ -568,6 +726,39 @@ export function SignDocumentWorkspace() {
       />
     </>
   );
+}
+
+/**
+ * Một bước "xong" khi không còn thông báo nào của `validateSignForm` mang nhãn
+ * của nó — không có cờ riêng nào để lệch pha với nút ký.
+ *
+ * Bước cuối là ngoại lệ: nó không có ràng buộc riêng nào (mọi lỗi đều thuộc bốn
+ * bước trước), nên chỉ đánh dấu xong khi tài liệu đã ký thật.
+ *
+ * `reachable` cộng dồn theo chiều đi tới: gặp bước đầu tiên chưa xong là khoá
+ * hết phần còn lại. Đây là lý do không cần effect nào để kéo người dùng lùi lại
+ * khi họ sửa ngược một bước phía trên.
+ */
+function buildStepViews(
+  steps: SignStepId[],
+  byStep: Record<SignStepId, string[]>,
+  documentSigned: boolean,
+): SignStepView[] {
+  let open = true;
+  return steps.map((id) => {
+    const complete = id === "review" ? documentSigned : (byStep[id]?.length ?? 0) === 0;
+    const view: SignStepView = { id, complete, reachable: open };
+    if (!complete) open = false;
+    return view;
+  });
+}
+
+function furthestReachable(views: SignStepView[]): number {
+  let last = 0;
+  views.forEach((view, index) => {
+    if (view.reachable) last = index;
+  });
+  return last;
 }
 
 /**
@@ -637,13 +828,28 @@ function ResumeBanner({
 
 interface ConfigurationPanelProps {
   t: Dictionary;
+  /** Bước đang hiện — panel chỉ dựng đúng thẻ của bước này. */
+  step: SignStepId;
+  stepComplete: boolean;
+  previousStep?: SignStepId;
+  nextStep?: SignStepId;
+  onStepChange: (step: SignStepId) => void;
   capabilities?: SignCapabilities;
+  /** Nhãn thuật toán do backend đặt — không dựng nhãn ở client. */
+  catalog: AlgorithmCatalog;
   capabilitiesLoading: boolean;
   capabilitiesError?: string;
   onReloadCapabilities: () => void;
   source?: SignatureSource;
   form?: SignFormState;
+  file?: File;
+  contentType?: ContentType;
   documentFormat?: DocumentFormat;
+  dragging: boolean;
+  documentInputRef: React.RefObject<HTMLInputElement | null>;
+  onDraggingChange: (dragging: boolean) => void;
+  onSelectFile: (file?: File) => void;
+  onRemoveFile: () => void;
   targets: TargetSignature[];
   scanningTargets: boolean;
   p12File?: File;
@@ -653,7 +859,9 @@ interface ConfigurationPanelProps {
   credentialsLoading: boolean;
   credentialsError?: string;
   onLoadCredentials: () => void;
+  /** Chỉ những gì đang chặn BƯỚC NÀY — danh sách đầy đủ không giúp gì ở đây. */
   blockers: string[];
+  appearanceSupported: boolean;
   flow: FlowState;
   canSign: boolean;
   agreementStage: AgreementStage;
@@ -662,26 +870,31 @@ interface ConfigurationPanelProps {
   onUpdate: <K extends keyof SignFormState>(key: K, value: SignFormState[K]) => void;
   onSign: () => void;
   onShowResult: () => void;
+  /** Về bước 1 với tài liệu gốc — chỉ có nghĩa sau khi đã ký xong. */
+  onRestart: () => void;
 }
 
+/**
+ * Khối cấu hình, dựng đúng MỘT bước mỗi lần.
+ *
+ * Bố cục của mọi bước giống hệt nhau — mô tả ngắn, thẻ nội dung, lỗi còn lại,
+ * rồi cặp nút quay lại/tiếp tục — nên người dùng không phải học lại chỗ đặt tay
+ * ở mỗi bước.
+ */
 function ConfigurationPanel(props: ConfigurationPanelProps) {
   const {
     t,
-    capabilities,
-    capabilitiesLoading,
-    capabilitiesError,
-    onReloadCapabilities,
+    step,
+    stepComplete,
+    previousStep,
+    nextStep,
+    onStepChange,
     source,
     form,
-    documentFormat,
     blockers,
     flow,
-    canSign,
-    onSourceChange,
-    onUpdate,
-    onSign,
-    onShowResult,
   } = props;
+  const s = t.sign.steps;
 
   return (
     <section aria-labelledby="configuration-heading" className="space-y-3">
@@ -689,55 +902,56 @@ function ConfigurationPanel(props: ConfigurationPanelProps) {
         {t.sign.config.configurationTitle}
       </h2>
 
-      <ConfigCard title={t.sign.source.title}>
-        {capabilitiesError ? (
-          <div className="space-y-2">
-            <p className="rounded-md bg-danger-subtle p-3 text-[11.5px] text-danger">
-              {capabilitiesError}
-            </p>
-            <button
-              type="button"
-              onClick={onReloadCapabilities}
-              className="h-8 rounded-md border border-border bg-surface px-3 text-[11.5px] font-semibold text-fg"
-            >
-              {t.sign.source.retry}
-            </button>
-          </div>
-        ) : capabilitiesLoading ? (
-          <p className="text-[11.5px] text-fg-muted">{t.sign.source.loading}</p>
-        ) : !capabilities?.sources.length ? (
-          <p className="text-[11.5px] text-fg-muted">{t.sign.source.empty}</p>
-        ) : (
-          <SourcePicker
-            t={t}
-            sources={capabilities.sources}
-            selectedId={form?.sourceId}
-            documentFormat={documentFormat}
-            onChange={onSourceChange}
-          />
-        )}
-      </ConfigCard>
+      <p className="text-[11.5px] leading-relaxed text-fg-muted">{s[step].description}</p>
 
-      {source && form ? (
+      {step === "document" ? (
+        <DocumentPanel
+          t={t}
+          file={props.file}
+          format={props.contentType}
+          documentFormat={props.documentFormat}
+          dragging={props.dragging}
+          inputRef={props.documentInputRef}
+          onDraggingChange={props.onDraggingChange}
+          onSelectFile={props.onSelectFile}
+          onRemoveFile={props.onRemoveFile}
+        />
+      ) : null}
+
+      {step === "source" ? <SourceCard {...props} /> : null}
+
+      {step === "credential" && source && form ? (
         <>
           {isPkcs12(source) ? <Pkcs12Card {...props} source={source} form={form} /> : null}
           {isMpki(source) ? <MpkiCard {...props} source={source} form={form} /> : null}
           {isSignCloud(source) ? <SignCloudCard {...props} source={source} form={form} /> : null}
-          {isUsbToken(source) ? <UsbTokenCard t={t} form={form} onUpdate={onUpdate} /> : null}
-
-          <SignatureConfigCard
-            t={t}
-            source={source}
-            form={form}
-            appearanceSupported={supportsVisibleSignature(source, documentFormat)}
-            targets={props.targets}
-            scanningTargets={props.scanningTargets}
-            onUpdate={onUpdate}
-          />
+          {isUsbToken(source) ? (
+            <UsbTokenCard t={t} form={form} onUpdate={props.onUpdate} />
+          ) : null}
         </>
       ) : null}
 
-      {blockers.length > 0 ? (
+      {step === "signature" && source && form ? (
+        <SignatureConfigCard
+          t={t}
+          source={source}
+          form={form}
+          catalog={props.catalog}
+          documentFormat={props.documentFormat}
+          appearanceSupported={supportsVisibleSignature(source, props.documentFormat)}
+          targets={props.targets}
+          scanningTargets={props.scanningTargets}
+          onUpdate={props.onUpdate}
+        />
+      ) : null}
+
+      {step === "review" ? <ReviewCard {...props} /> : null}
+
+      {/*
+        Bước 1 CỐ Ý không hiện lỗi: "hãy chọn tài liệu" nằm ngay dưới một ô kéo
+        thả rỗng chỉ là tiếng ồn.
+      */}
+      {step !== "document" && blockers.length > 0 ? (
         <div role="status" className="rounded-lg border border-warning bg-warning-subtle p-3">
           <div className="flex gap-2">
             <InfoIcon size={15} className="mt-0.5 shrink-0 text-warning" />
@@ -750,6 +964,9 @@ function ConfigurationPanel(props: ConfigurationPanelProps) {
         </div>
       ) : null}
 
+      {step === "review" ? <SignAction {...props} /> : null}
+
+      {/* Lỗi ký hiện ở mọi bước: người dùng có thể đã quay lại sửa cấu hình. */}
       {flow.phase === "failed" ? (
         <div className="rounded-lg border border-danger bg-danger-subtle p-3">
           <p className="text-[12.5px] font-semibold text-danger">{t.sign.config.signFailedTitle}</p>
@@ -759,7 +976,141 @@ function ConfigurationPanel(props: ConfigurationPanelProps) {
         </div>
       ) : null}
 
-      {flow.phase === "completed" ? (
+      {/* Bước đầu không có nút Quay lại — `ml-auto` giữ nút Tiếp tục ở bên phải. */}
+      <div className="flex items-center justify-between gap-2 pt-0.5">
+        {previousStep ? (
+          <button
+            type="button"
+            onClick={() => onStepChange(previousStep)}
+            className="flex h-9 items-center gap-1.5 rounded-md border border-border bg-surface pl-2.5 pr-3 text-[12.5px] font-semibold text-fg"
+          >
+            <ArrowLeftIcon size={14} />
+            {s.back}
+          </button>
+        ) : null}
+
+        {nextStep ? (
+          <button
+            type="button"
+            disabled={!stepComplete}
+            onClick={() => onStepChange(nextStep)}
+            title={stepComplete ? undefined : s.lockedHint}
+            className="ml-auto flex h-9 items-center gap-1.5 rounded-md border border-accent bg-accent pl-3.5 pr-3 text-[12.5px] font-semibold text-accent-fg disabled:cursor-not-allowed disabled:opacity-45"
+          >
+            {s.next}
+            <ArrowRightIcon size={14} />
+          </button>
+        ) : null}
+      </div>
+    </section>
+  );
+}
+
+/** Bước 2 — nguồn chữ ký, cộng các trạng thái của `GET /capabilities`. */
+function SourceCard({
+  t,
+  capabilities,
+  capabilitiesLoading,
+  capabilitiesError,
+  onReloadCapabilities,
+  form,
+  documentFormat,
+  onSourceChange,
+}: ConfigurationPanelProps) {
+  return (
+    <ConfigCard title={t.sign.source.title}>
+      {capabilitiesError ? (
+        <div className="space-y-2">
+          <p className="rounded-md bg-danger-subtle p-3 text-[11.5px] text-danger">
+            {capabilitiesError}
+          </p>
+          <button
+            type="button"
+            onClick={onReloadCapabilities}
+            className="h-8 rounded-md border border-border bg-surface px-3 text-[11.5px] font-semibold text-fg"
+          >
+            {t.sign.source.retry}
+          </button>
+        </div>
+      ) : capabilitiesLoading ? (
+        <p className="text-[11.5px] text-fg-muted">{t.sign.source.loading}</p>
+      ) : !capabilities?.sources.length ? (
+        <p className="text-[11.5px] text-fg-muted">{t.sign.source.empty}</p>
+      ) : (
+        <SourcePicker
+          t={t}
+          sources={capabilities.sources}
+          selectedId={form?.sourceId}
+          documentFormat={documentFormat}
+          onChange={onSourceChange}
+        />
+      )}
+    </ConfigCard>
+  );
+}
+
+/**
+ * Bước cuối — nhắc lại đúng những gì sắp được gửi đi. Bốn dòng này là toàn bộ
+ * phần người dùng vừa cấu hình ở ba bước trước, gom vào một chỗ để đọc lại trước
+ * khi bấm một nút có tính phí.
+ */
+function ReviewCard({
+  t,
+  file,
+  documentFormat,
+  source,
+  form,
+  catalog,
+  appearanceSupported,
+}: ConfigurationPanelProps) {
+  const s = t.sign.steps;
+  return (
+    <ConfigCard title={s.summaryTitle}>
+      <dl className="divide-y divide-border-muted">
+        <SummaryRow label={s.summaryDocument} value={file?.name ?? s.summaryUnset} />
+        <SummaryRow label={s.summaryFormat} value={documentFormat ?? s.summaryUnset} />
+        <SummaryRow label={s.summarySource} value={source ? sourceLabel(source) : s.summaryUnset} />
+        <SummaryRow
+          label={s.summaryProfile}
+          value={
+            form ? `${form.baselineLevel} · ${algorithmLabel(form.algorithm, catalog)}` : s.summaryUnset
+          }
+        />
+        {appearanceSupported ? (
+          <SummaryRow
+            label={s.summaryAppearance}
+            value={form?.visibleSignature ? s.summaryOn : s.summaryOff}
+          />
+        ) : null}
+      </dl>
+    </ConfigCard>
+  );
+}
+
+function SummaryRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="grid grid-cols-[88px_1fr] gap-3 py-2.5 text-[11.5px]">
+      <dt className="text-fg-muted">{label}</dt>
+      <dd className="min-w-0 truncate text-right font-semibold text-fg" title={value}>
+        {value}
+      </dd>
+    </div>
+  );
+}
+
+/** Nút ký / nút tải tệp đã ký. Chỉ sống ở bước cuối. */
+function SignAction({
+  t,
+  source,
+  flow,
+  canSign,
+  onSign,
+  onShowResult,
+  onRestart,
+}: ConfigurationPanelProps) {
+  if (flow.phase === "completed") {
+    return (
+      <div className="space-y-2">
         <button
           type="button"
           onClick={onShowResult}
@@ -768,25 +1119,47 @@ function ConfigurationPanel(props: ConfigurationPanelProps) {
           <DownloadIcon size={16} />
           {t.sign.config.downloadSignedFile}
         </button>
-      ) : (
-        <>
-          <button
-            type="button"
-            disabled={!canSign}
-            onClick={onSign}
-            className="flex h-11 w-full items-center justify-center gap-2 rounded-lg border border-accent bg-accent text-[14px] font-bold text-accent-fg disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            <CheckIcon size={16} />
-            {flow.phase === "signing" ? t.sign.status.signing : t.sign.config.signButton}
-          </button>
-          {source && t.sign.source.interaction[source.interactionModel] ? (
-            <p className="text-center text-[10.5px] leading-relaxed text-fg-muted">
-              {t.sign.source.interaction[source.interactionModel]}
-            </p>
-          ) : null}
-        </>
-      )}
-    </section>
+
+        {/*
+          Nút phụ, KHÔNG phải nút nhấn mạnh: tải tệp về vẫn là việc cần làm
+          trước — bắt đầu lại mà chưa tải là mất hẳn kết quả vừa ký.
+        */}
+        <button
+          type="button"
+          onClick={onRestart}
+          className="flex h-9 w-full items-center justify-center gap-1.5 rounded-md border border-border bg-surface text-[12.5px] font-semibold text-fg"
+        >
+          <RotateCcwIcon size={14} />
+          {t.sign.steps.restart}
+        </button>
+        <p className="text-center text-[10.5px] leading-relaxed text-fg-muted">
+          {t.sign.steps.restartHint}
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <button
+        type="button"
+        disabled={!canSign}
+        onClick={onSign}
+        className="flex h-11 w-full items-center justify-center gap-2 rounded-lg border border-accent bg-accent text-[14px] font-bold text-accent-fg disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        {flow.phase === "signing" ? (
+          <SpinnerIcon size={16} className="animate-spin" />
+        ) : (
+          <CheckIcon size={16} />
+        )}
+        {flow.phase === "signing" ? t.sign.status.signing : t.sign.config.signButton}
+      </button>
+      {source && t.sign.source.interaction[source.interactionModel] ? (
+        <p className="text-center text-[10.5px] leading-relaxed text-fg-muted">
+          {t.sign.source.interaction[source.interactionModel]}
+        </p>
+      ) : null}
+    </>
   );
 }
 
@@ -1068,6 +1441,8 @@ function UsbTokenCard({
         </div>
 
         <p className="text-[10.5px] leading-relaxed text-fg-muted">{u.note}</p>
+        {/* Vì sao dropdown thuật toán của luồng này ngắn hơn các luồng khác. */}
+        <p className="text-[10.5px] leading-relaxed text-fg-muted">{u.algorithmNote}</p>
         <WarningBlock>{u.pinPolicyNote}</WarningBlock>
       </div>
     </ConfigCard>
@@ -1667,6 +2042,8 @@ function SignatureConfigCard({
   t,
   source,
   form,
+  catalog,
+  documentFormat,
   appearanceSupported,
   targets,
   scanningTargets,
@@ -1675,6 +2052,8 @@ function SignatureConfigCard({
   t: Dictionary;
   source: SignatureSource;
   form: SignFormState;
+  catalog: AlgorithmCatalog;
+  documentFormat?: DocumentFormat;
   /** Nguồn khai `visibleSignature` VÀ tài liệu là PDF. */
   appearanceSupported: boolean;
   targets: TargetSignature[];
@@ -1710,20 +2089,14 @@ function SignatureConfigCard({
           ) : null}
         </fieldset>
 
-        <Field label={c.algorithmLabel} htmlFor="signature-algorithm">
-          <select
-            id="signature-algorithm"
-            value={form.algorithm}
-            onChange={(event) => onUpdate("algorithm", event.target.value)}
-            className="h-9 w-full rounded-md border border-border bg-surface px-2 text-[12px] text-fg"
-          >
-            {source.algorithms.map((algorithm) => (
-              <option key={algorithm} value={algorithm}>
-                {algorithmLabel(algorithm)}
-              </option>
-            ))}
-          </select>
-        </Field>
+        <AlgorithmPicker
+          t={t}
+          source={source}
+          form={form}
+          catalog={catalog}
+          documentFormat={documentFormat}
+          onUpdate={onUpdate}
+        />
 
         {source.signatureModes.length > 0 ? (
           <fieldset>
@@ -1784,6 +2157,91 @@ function SignatureConfigCard({
         </Field>
       </div>
     </ConfigCard>
+  );
+}
+
+/**
+ * Dropdown thuật toán ký.
+ *
+ * Ba quyết định ở đây, và cả ba đều là hàng rào chống một ca hỏng cụ thể:
+ *
+ * 1. Danh sách đọc từ `algorithmsFor(source, format)` — tức
+ *    `algorithmsByFormat[format]` — chứ KHÔNG từ `source.algorithms`. Trường sau
+ *    là hợp của mọi định dạng: dựng dropdown từ nó cho phép chọn PSS với file
+ *    `.docx` và ăn `422 ALGORITHM_NOT_SUPPORTED`.
+ *
+ * 2. Nhãn lấy từ `algorithmCatalog[].label` của backend. Bảng nhãn hardcode ở
+ *    client lệch pha ngay lần thêm thuật toán tiếp theo — và lệch theo kiểu tệ
+ *    nhất: người dùng thấy một tên, file ký ra mang thuật toán khác.
+ *
+ * 3. Thứ tự giữ NGUYÊN như backend trả (PSS → PKCS#1 → ECDSA, phần tử đầu là
+ *    mặc định). `<optgroup>` chỉ gom lại cho dễ đọc, không sắp xếp lại.
+ *
+ * Nhóm ECDSA vẫn hiện đủ dù chưa biết chứng thư có khoá EC hay không: điều đó
+ * chỉ biết được sau khi mở file .p12 bằng mật khẩu — tức sau khi đã bấm Ký. Ghi
+ * chú dưới ô là thứ duy nhất làm được từ trước; phần còn lại dựa vào mã lỗi
+ * `ALGORITHM_KEY_TYPE_MISMATCH`.
+ */
+function AlgorithmPicker({
+  t,
+  source,
+  form,
+  catalog,
+  documentFormat,
+  onUpdate,
+}: {
+  t: Dictionary;
+  source: SignatureSource;
+  form: SignFormState;
+  catalog: AlgorithmCatalog;
+  documentFormat?: DocumentFormat;
+  onUpdate: <K extends keyof SignFormState>(key: K, value: SignFormState[K]) => void;
+}) {
+  const c = t.sign.config;
+  const available = algorithmsFor(source, documentFormat);
+  const groups = groupAlgorithms(available, catalog);
+  const restricted =
+    Boolean(documentFormat) && available.length < (source.algorithms?.length ?? 0);
+
+  if (available.length === 0) {
+    return (
+      <Field label={c.algorithmLabel}>
+        <p className="text-[11px] text-warning">
+          {documentFormat ? c.algorithmNoneForFormat(documentFormat) : c.algorithmNone}
+        </p>
+      </Field>
+    );
+  }
+
+  return (
+    <Field label={c.algorithmLabel} htmlFor="signature-algorithm">
+      <select
+        id="signature-algorithm"
+        value={form.algorithm}
+        onChange={(event) => onUpdate("algorithm", event.target.value)}
+        className="h-9 w-full rounded-md border border-border bg-surface px-2 text-[12px] text-fg"
+      >
+        {groups.map((group) => (
+          <optgroup key={group.scheme} label={c.algorithmScheme[group.scheme] ?? group.scheme}>
+            {group.options.map((option) => (
+              <option key={option.id} value={option.id}>
+                {option.label}
+              </option>
+            ))}
+          </optgroup>
+        ))}
+      </select>
+
+      {restricted && documentFormat ? (
+        <p className="mt-1.5 text-[10.5px] leading-relaxed text-fg-muted">
+          {c.algorithmFormatNote(documentFormat)}
+        </p>
+      ) : null}
+
+      {requiresEcKey(form.algorithm, catalog) ? (
+        <p className="mt-1.5 text-[10.5px] leading-relaxed text-warning">{c.algorithmEcNote}</p>
+      ) : null}
+    </Field>
   );
 }
 
@@ -1884,6 +2342,7 @@ function SigningResultDialog({
   document,
   source,
   form,
+  catalog,
   onClose,
   onSignAgain,
 }: {
@@ -1892,6 +2351,7 @@ function SigningResultDialog({
   document?: SignedDocument;
   source?: SignatureSource;
   form?: SignFormState;
+  catalog: AlgorithmCatalog;
   onClose: () => void;
   onSignAgain: () => void;
 }) {
@@ -1925,7 +2385,7 @@ function SigningResultDialog({
         />
         <ResultRow
           label={t.sign.result.profile}
-          value={form ? `${form.baselineLevel} · ${algorithmLabel(form.algorithm)}` : "—"}
+          value={form ? `${form.baselineLevel} · ${algorithmLabel(form.algorithm, catalog)}` : "—"}
         />
       </dl>
 

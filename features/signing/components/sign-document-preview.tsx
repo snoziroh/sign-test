@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { detectOoxmlKind, type ContentType } from "@/lib/types/domain";
 import type { DocumentFormat } from "@/lib/types/signing";
-import { XIcon } from "@/components/ui/icons";
+import { CheckIcon, XIcon } from "@/components/ui/icons";
 import type { Dictionary } from "@/lib/i18n";
 import { ACCEPTED_EXTENSIONS, fileExtension, formatBytes } from "@/features/signing/document-format";
 
@@ -173,6 +173,7 @@ export function DocumentPreview({
   t,
   file,
   format,
+  signed = false,
   visibleSignature,
   signaturePosition,
   onSignaturePositionChange,
@@ -181,6 +182,11 @@ export function DocumentPreview({
   t: Dictionary;
   file?: File;
   format?: DetectedFormat;
+  /**
+   * `file` là TỆP ĐÃ KÝ chứ không phải bản gốc. Chỉ đổi phần nhãn ở đầu khung —
+   * hai tệp trông giống hệt nhau nên không nói ra thì không phân biệt được.
+   */
+  signed?: boolean;
   visibleSignature: boolean;
   signaturePosition: SignaturePosition;
   onSignaturePositionChange: (position: SignaturePosition) => void;
@@ -191,14 +197,22 @@ export function DocumentPreview({
       aria-labelledby="preview-heading"
       className="overflow-hidden rounded-lg border border-border bg-surface shadow-sm"
     >
-      <header className="flex items-center justify-between border-b border-border-muted px-4 py-2.5">
+      <header className="flex items-center justify-between gap-3 border-b border-border-muted px-4 py-2.5">
         <h2 id="preview-heading" className="text-[13px] font-semibold text-fg">
-          {t.sign.preview.title}
+          {signed ? t.sign.preview.signedTitle : t.sign.preview.title}
         </h2>
         {file ? (
-          <span className="rounded-full bg-inset px-2 py-0.5 font-mono text-[10.5px] text-fg-muted">
-            {format ? t.sign.contentLabel[format] : t.sign.preview.unknownType}
-          </span>
+          <div className="flex min-w-0 items-center gap-2">
+            {signed ? (
+              <span className="flex shrink-0 items-center gap-1 rounded-full bg-success-subtle px-2 py-0.5 text-[10.5px] font-semibold text-success">
+                <CheckIcon size={11} />
+                {t.sign.preview.signedBadge}
+              </span>
+            ) : null}
+            <span className="truncate rounded-full bg-inset px-2 py-0.5 font-mono text-[10.5px] text-fg-muted">
+              {format ? t.sign.contentLabel[format] : t.sign.preview.unknownType}
+            </span>
+          </div>
         ) : null}
       </header>
 

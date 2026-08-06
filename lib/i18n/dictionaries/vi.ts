@@ -324,6 +324,45 @@ export const vi: Dictionary = {
       resume: "Nối lại",
       dismiss: "Bỏ qua",
     },
+    steps: {
+      navLabel: "Các bước ký",
+      stepOf: (current: number, total: number) => `Bước ${current} / ${total}`,
+      back: "Quay lại",
+      next: "Tiếp tục",
+      lockedHint: "Hoàn tất các bước trước để mở bước này.",
+      document: {
+        label: "Tài liệu",
+        description: "Định dạng tệp quyết định những nguồn chữ ký dùng được ở bước sau.",
+      },
+      source: {
+        label: "Nguồn ký",
+        description: "Nguồn không ký được định dạng này vẫn hiện ra, chỉ bị khoá kèm lý do.",
+      },
+      credential: {
+        label: "Thông tin ký",
+        description: "Những gì nguồn này cần ở bạn trước khi chạm được tới khoá riêng.",
+      },
+      signature: {
+        label: "Chữ ký",
+        description: "Mức baseline, thuật toán và cách chữ ký hiển thị trên tài liệu.",
+      },
+      review: {
+        label: "Xác nhận",
+        description: "Xem lại cấu hình, rồi gửi lệnh ký.",
+      },
+      summaryTitle: "Sẵn sàng ký",
+      summaryDocument: "Tài liệu",
+      summaryFormat: "Định dạng",
+      summarySource: "Nguồn ký",
+      summaryProfile: "Cấu hình",
+      summaryAppearance: "Chữ ký hiển thị",
+      summaryOn: "Bật",
+      summaryOff: "Tắt",
+      summaryUnset: "—",
+      restart: "Ký lại từ đầu",
+      restartHint:
+        "Xoá tài liệu, khoá ký và mọi lựa chọn — trang trở về đúng trạng thái lúc mới mở. Tải file đã ký về trước: nó chỉ tồn tại trong trang này.",
+    },
     document: {
       sectionTitle: "Tài liệu",
       dropHere: "Kéo thả tài liệu vào đây",
@@ -347,6 +386,8 @@ export const vi: Dictionary = {
     },
     preview: {
       title: "Xem trước",
+      signedTitle: "Tài liệu đã ký",
+      signedBadge: "Đã ký",
       unknownType: "Loại không xác định",
       emptyTitle: "Chưa chọn tài liệu",
       emptyDescription: "Chọn một tài liệu để xem trước vùng ký.",
@@ -381,6 +422,19 @@ export const vi: Dictionary = {
       timestampNote:
         "Baseline T LUÔN gọi TSA, không phụ thuộc cờ SIGNING_TSA_ENABLED. Nếu ký lỗi SIGNING_FAILED, thử lại với baseline B để tách bạch lỗi TSA khỏi lỗi ký.",
       algorithmLabel: "Thuật toán ký",
+      /** Nhãn nhóm `<optgroup>`. Nhãn từng thuật toán lấy từ algorithmCatalog. */
+      algorithmScheme: {
+        RSASSA_PSS: "RSA-PSS (khuyến nghị)",
+        RSA_PKCS1_V1_5: "RSA PKCS#1 v1.5 (tương thích rộng nhất)",
+        ECDSA: "ECDSA (cần chứng thư khoá EC)",
+      } as Record<string, string>,
+      algorithmNone: "Nguồn này không khai báo thuật toán nào.",
+      algorithmNoneForFormat: (format: string) =>
+        `Nguồn này không ký được định dạng ${format}.`,
+      algorithmFormatNote: (format: string) =>
+        `${format} chỉ ký được bằng RSA PKCS#1 v1.5: ECMA-376 Part 2 không định nghĩa RSA-PSS hay ECDSA cho chữ ký gói, và Word/Excel không đọc được chúng. Đây là giới hạn của định dạng, không phải của dịch vụ ký.`,
+      algorithmEcNote:
+        "ECDSA cần chứng thư dùng khoá EC. Không kiểm tra trước được — loại khoá chỉ đọc được sau khi mở file khoá bằng mật khẩu. Chứng thư khoá RSA sẽ báo ALGORITHM_KEY_TYPE_MISMATCH lúc ký.",
       signatureTypeLabel: "Loại ký",
       coSign: "Đồng ký",
       counterSign: "Xác nhận ký",
@@ -528,6 +582,8 @@ export const vi: Dictionary = {
       agentReady: (count: number) =>
         `Signing Agent đã phản hồi — tìm thấy ${count} chứng thư trong token.`,
       note: "FPT-CA Signing Agent phải đang chạy trên chính máy này ở localhost:14211. Trình duyệt gọi thẳng tới đó — không có thông tin nào của token đi qua dịch vụ ký.",
+      algorithmNote:
+        "Luồng này chỉ có ba lựa chọn RSA PKCS#1 v1.5. FPT-CA Signing Agent 1.3.1 không có tham số nào khai sơ đồ ký — /SignHash chỉ nhận hàm băm — nên chọn RSA-PSS hay ECDSA là chắc chắn hỏng ở bước cuối.",
       pinPolicyNote:
         "PIN chỉ được nhập trong cửa sổ của FPT-CA. Trang này không hỏi, không chuyển tiếp và không lưu PIN.",
 
@@ -560,6 +616,11 @@ export const vi: Dictionary = {
       retry: "Làm lại từ đầu",
       jobExpiresIn: (countdown: string) => `Phiên ký hết hạn sau ${countdown}`,
       jobExpired: "Phiên ký đã hết hạn — làm lại từ đầu.",
+      jobAlgorithm: (label: string) => `Thuật toán của phiên ký: ${label}`,
+      errorSchemeUnsupported: (label: string) =>
+        `Dịch vụ ký đã chuẩn bị phiên này cho ${label}, nhưng FPT-CA Signing Agent 1.3.1 chỉ ký được RSA PKCS#1 v1.5. Ký tiếp sẽ hỏng ở bước cuối, nên đã dừng tại đây. Chọn một thuật toán RSA PKCS#1 v1.5 rồi ký lại.`,
+      errorDigestUnsupported:
+        "USB Token không ký được với hàm băm đã chọn. Thử lại với RSA PKCS#1 v1.5 / SHA-256 — thiết bị đời cũ thường chỉ làm được SHA-256.",
       errorUnreachable:
         "Không gọi được FPT-CA Signing Agent ở localhost:14211. Kiểm tra agent đang chạy, và trình duyệt có được phép truy cập mạng nội bộ không.",
       errorAgentToken:
@@ -655,6 +716,8 @@ export const vi: Dictionary = {
       formatNotSupported: (source: string) => `${source} không ký được định dạng này.`,
       tooLarge: (limit: string) => `Tài liệu vượt giới hạn ${limit} của dịch vụ ký.`,
       algorithmUnsupported: "Thuật toán đang chọn không nằm trong danh sách nguồn này hỗ trợ.",
+      algorithmUnsupportedForFormat: (format: string) =>
+        `Nguồn này có thuật toán đang chọn, nhưng định dạng ${format} không chở được nó. Chọn một thuật toán RSA PKCS#1 v1.5, hoặc ký một tệp PDF/XML.`,
       baselineUnsupported: (level: string) => `Nguồn này không hỗ trợ mức baseline ${level}.`,
       chooseMode: "Chọn loại ký mà nguồn này hỗ trợ.",
       targetRequired: "Counter-sign cần id của một chữ ký đã có trong tài liệu.",

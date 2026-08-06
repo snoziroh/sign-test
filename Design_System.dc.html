@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --canvas:#ffffff; --surface:#ffffff; --surface-2:#f6f8fa; --inset:#eaeef2;
+    --border:#d0d7de; --border-muted:#e4e8ec;
+    --fg:#1f2328; --fg-muted:#636c76; --fg-subtle:#8b949e;
+    --accent:#0969da; --accent-fg:#ffffff; --accent-subtle:#ddf4ff;
+    --success:#1a7f37; --success-subtle:#dafbe1;
+    --warning:#9a6700; --warning-subtle:#fff8c5;
+    --danger:#cf222e; --danger-subtle:#ffebe9;
+    --shadow-sm:0 1px 0 rgba(31,35,40,.04);
+    --shadow-md:0 1px 3px rgba(31,35,40,.10),0 8px 24px rgba(31,35,40,.06);
+    --overlay:rgba(31,35,40,.45);
+  }
+  :root[data-theme="dark"]{
+    --canvas:#0d1117; --surface:#161b22; --surface-2:#0d1117; --inset:#010409;
+    --border:#30363d; --border-muted:#21262d;
+    --fg:#e6edf3; --fg-muted:#8b949e; --fg-subtle:#6e7681;
+    --accent:#2f81f7; --accent-fg:#ffffff; --accent-subtle:#0d2440;
+    --success:#3fb950; --success-subtle:#12261c;
+    --warning:#d29922; --warning-subtle:#2a2113;
+    --danger:#f85149; --danger-subtle:#2a1517;
+    --shadow-sm:0 0 0 1px rgba(0,0,0,.15);
+    --shadow-md:0 8px 24px rgba(1,4,9,.6);
+    --overlay:rgba(1,4,9,.65);
+  }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; padding:0; }
+  body{ background:var(--canvas); color:var(--fg); font-family:'IBM Plex Sans',system-ui,sans-serif; -webkit-font-smoothing:antialiased; transition:background .18s ease,color .18s ease; }
+  a{ color:var(--accent); text-decoration:none; }
+  a:hover{ text-decoration:underline; }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+  @keyframes indet{ 0%{ left:-40%; } 100%{ left:100%; } }
+</style>
+</helmet>
+
+<div style="min-height:100vh; background:var(--canvas);">
+
+  <!-- ===== TOP BAR ===== -->
+  <div style="position:sticky; top:0; z-index:20; background:var(--surface); border-bottom:1px solid var(--border); backdrop-filter:saturate(1.2);">
+    <div style="max-width:1160px; margin:0 auto; padding:12px 32px; display:flex; align-items:center; gap:14px;">
+      <span style="display:inline-flex; color:var(--accent);"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg></span>
+      <div style="line-height:1.1;">
+        <div style="font-weight:600; font-size:15px;">Sigil</div>
+        <div style="font-family:'IBM Plex Mono',monospace; font-size:10.5px; letter-spacing:.06em; color:var(--fg-subtle);">DESIGN SYSTEM · v1.0</div>
+      </div>
+      <div style="flex:1;"></div>
+      <span style="font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--fg-muted); margin-right:6px;">Enterprise Security UI</span>
+      <button onClick="{{ toggle }}" style="display:inline-flex; align-items:center; gap:7px; height:32px; padding:0 12px; border:1px solid var(--border); border-radius:6px; background:var(--surface-2); color:var(--fg); font-family:'IBM Plex Sans',sans-serif; font-size:12.5px; font-weight:500; cursor:pointer;">
+        <span style="display:inline-flex; color:var(--fg-muted);"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg></span>
+        {{ themeLabel }}
+      </button>
+    </div>
+  </div>
+
+  <!-- ===== SECTION NAV ===== -->
+  <div style="border-bottom:1px solid var(--border-muted); background:var(--canvas);">
+    <div style="max-width:1160px; margin:0 auto; padding:10px 32px; display:flex; flex-wrap:wrap; gap:14px; font-size:12.5px; font-family:'IBM Plex Mono',monospace; color:var(--fg-muted);">
+      <a href="#foundations" style="color:var(--fg-muted);">Foundations</a>
+      <a href="#buttons" style="color:var(--fg-muted);">Buttons</a>
+      <a href="#forms" style="color:var(--fg-muted);">Forms</a>
+      <a href="#cards" style="color:var(--fg-muted);">Cards</a>
+      <a href="#tables" style="color:var(--fg-muted);">Tables</a>
+      <a href="#dialogs" style="color:var(--fg-muted);">Dialogs</a>
+      <a href="#tabs" style="color:var(--fg-muted);">Tabs</a>
+      <a href="#trees" style="color:var(--fg-muted);">Trees</a>
+      <a href="#cert" style="color:var(--fg-muted);">Certificate</a>
+      <a href="#timeline" style="color:var(--fg-muted);">Timeline</a>
+      <a href="#status" style="color:var(--fg-muted);">Status</a>
+      <a href="#charts" style="color:var(--fg-muted);">Charts</a>
+      <a href="#progress" style="color:var(--fg-muted);">Progress</a>
+      <a href="#upload" style="color:var(--fg-muted);">Upload</a>
+      <a href="#console" style="color:var(--fg-muted);">Dev Console</a>
+    </div>
+  </div>
+
+  <div style="max-width:1160px; margin:0 auto; padding:40px 32px 100px;">
+
+    <!-- ============================ FOUNDATIONS ============================ -->
+    <section id="foundations" style="scroll-margin-top:120px;">
+      <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--accent); font-weight:600;">Foundations</div>
+      <h2 style="font-size:26px; font-weight:600; margin:8px 0 6px; letter-spacing:-0.01em;">Typography, Color, Spacing &amp; Radius</h2>
+      <p style="font-size:14.5px; line-height:1.6; color:var(--fg-muted); margin:0 0 28px; max-width:70ch;">The tokens every component composes from. <strong style="color:var(--fg);">IBM Plex Sans</strong> for UI, <strong style="color:var(--fg);">IBM Plex Mono</strong> for identifiers, hashes, code, and technical values. All semantic colors are defined for both themes and referenced only by role — never by hex — in components.</p>
+
+      <!-- Type scale -->
+      <div style="border:1px solid var(--border); border-radius:10px; background:var(--surface); box-shadow:var(--shadow-sm); overflow:hidden; margin-bottom:22px;">
+        <div style="padding:12px 18px; border-bottom:1px solid var(--border-muted); font-size:12.5px; font-weight:600; color:var(--fg-muted); font-family:'IBM Plex Mono',monospace; letter-spacing:.04em;">TYPE SCALE</div>
+        <div style="padding:8px 18px;">
+          <div style="display:flex; align-items:baseline; gap:16px; padding:9px 0; border-bottom:1px solid var(--border-muted);"><span style="width:120px; font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--fg-subtle);">Display / 32·600</span><span style="font-size:32px; font-weight:600; letter-spacing:-0.02em;">Sign with confidence</span></div>
+          <div style="display:flex; align-items:baseline; gap:16px; padding:9px 0; border-bottom:1px solid var(--border-muted);"><span style="width:120px; font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--fg-subtle);">Title / 24·600</span><span style="font-size:24px; font-weight:600; letter-spacing:-0.01em;">Certificate management</span></div>
+          <div style="display:flex; align-items:baseline; gap:16px; padding:9px 0; border-bottom:1px solid var(--border-muted);"><span style="width:120px; font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--fg-subtle);">Heading / 20·600</span><span style="font-size:20px; font-weight:600;">HSM connection</span></div>
+          <div style="display:flex; align-items:baseline; gap:16px; padding:9px 0; border-bottom:1px solid var(--border-muted);"><span style="width:120px; font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--fg-subtle);">Body / 14·400</span><span style="font-size:14px;">Private keys never leave the custody boundary.</span></div>
+          <div style="display:flex; align-items:baseline; gap:16px; padding:9px 0; border-bottom:1px solid var(--border-muted);"><span style="width:120px; font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--fg-subtle);">Small / 12.5·400</span><span style="font-size:12.5px; color:var(--fg-muted);">Applies to labels, captions and helper text.</span></div>
+          <div style="display:flex; align-items:baseline; gap:16px; padding:9px 0;"><span style="width:120px; font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--fg-subtle);">Mono / 12.5</span><span style="font-family:'IBM Plex Mono',monospace; font-size:12.5px; color:var(--fg);">SHA-256 · 3f9a…c012</span></div>
+        </div>
+      </div>
+
+      <!-- Colors: both themes -->
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:22px;">
+        <div style="border:1px solid var(--border); border-radius:10px; background:var(--surface); overflow:hidden;">
+          <div style="padding:12px 18px; border-bottom:1px solid var(--border-muted); font-size:12.5px; font-weight:600; color:var(--fg-muted); font-family:'IBM Plex Mono',monospace;">LIGHT PALETTE</div>
+          <div style="padding:16px 18px; display:grid; grid-template-columns:repeat(2,1fr); gap:10px; font-family:'IBM Plex Mono',monospace; font-size:10.5px;">
+            <div style="display:flex; align-items:center; gap:8px;"><span style="width:24px;height:24px;border-radius:5px;background:#ffffff;border:1px solid #d0d7de;"></span><div><div style="color:var(--fg);">canvas</div><div style="color:var(--fg-subtle);">#ffffff</div></div></div>
+            <div style="display:flex; align-items:center; gap:8px;"><span style="width:24px;height:24px;border-radius:5px;background:#f6f8fa;border:1px solid #d0d7de;"></span><div><div style="color:var(--fg);">surface-2</div><div style="color:var(--fg-subtle);">#f6f8fa</div></div></div>
+            <div style="display:flex; align-items:center; gap:8px;"><span style="width:24px;height:24px;border-radius:5px;background:#1f2328;"></span><div><div style="color:var(--fg);">fg</div><div style="color:var(--fg-subtle);">#1f2328</div></div></div>
+            <div style="display:flex; align-items:center; gap:8px;"><span style="width:24px;height:24px;border-radius:5px;background:#636c76;"></span><div><div style="color:var(--fg);">fg-muted</div><div style="color:var(--fg-subtle);">#636c76</div></div></div>
+            <div style="display:flex; align-items:center; gap:8px;"><span style="width:24px;height:24px;border-radius:5px;background:#0969da;"></span><div><div style="color:var(--fg);">accent</div><div style="color:var(--fg-subtle);">#0969da</div></div></div>
+            <div style="display:flex; align-items:center; gap:8px;"><span style="width:24px;height:24px;border-radius:5px;background:#1a7f37;"></span><div><div style="color:var(--fg);">success</div><div style="color:var(--fg-subtle);">#1a7f37</div></div></div>
+            <div style="display:flex; align-items:center; gap:8px;"><span style="width:24px;height:24px;border-radius:5px;background:#9a6700;"></span><div><div style="color:var(--fg);">warning</div><div style="color:var(--fg-subtle);">#9a6700</div></div></div>
+            <div style="display:flex; align-items:center; gap:8px;"><span style="width:24px;height:24px;border-radius:5px;background:#cf222e;"></span><div><div style="color:var(--fg);">danger</div><div style="color:var(--fg-subtle);">#cf222e</div></div></div>
+          </div>
+        </div>
+        <div style="border:1px solid var(--border); border-radius:10px; background:#0d1117; overflow:hidden;">
+          <div style="padding:12px 18px; border-bottom:1px solid #21262d; font-size:12.5px; font-weight:600; color:#8b949e; font-family:'IBM Plex Mono',monospace;">DARK PALETTE</div>
+          <div style="padding:16px 18px; display:grid; grid-template-columns:repeat(2,1fr); gap:10px; font-family:'IBM Plex Mono',monospace; font-size:10.5px;">
+            <div style="display:flex; align-items:center; gap:8px;"><span style="width:24px;height:24px;border-radius:5px;background:#0d1117;border:1px solid #30363d;"></span><div><div style="color:#e6edf3;">canvas</div><div style="color:#6e7681;">#0d1117</div></div></div>
+            <div style="display:flex; align-items:center; gap:8px;"><span style="width:24px;height:24px;border-radius:5px;background:#161b22;border:1px solid #30363d;"></span><div><div style="color:#e6edf3;">surface</div><div style="color:#6e7681;">#161b22</div></div></div>
+            <div style="display:flex; align-items:center; gap:8px;"><span style="width:24px;height:24px;border-radius:5px;background:#e6edf3;"></span><div><div style="color:#e6edf3;">fg</div><div style="color:#6e7681;">#e6edf3</div></div></div>
+            <div style="display:flex; align-items:center; gap:8px;"><span style="width:24px;height:24px;border-radius:5px;background:#8b949e;"></span><div><div style="color:#e6edf3;">fg-muted</div><div style="color:#6e7681;">#8b949e</div></div></div>
+            <div style="display:flex; align-items:center; gap:8px;"><span style="width:24px;height:24px;border-radius:5px;background:#2f81f7;"></span><div><div style="color:#e6edf3;">accent</div><div style="color:#6e7681;">#2f81f7</div></div></div>
+            <div style="display:flex; align-items:center; gap:8px;"><span style="width:24px;height:24px;border-radius:5px;background:#3fb950;"></span><div><div style="color:#e6edf3;">success</div><div style="color:#6e7681;">#3fb950</div></div></div>
+            <div style="display:flex; align-items:center; gap:8px;"><span style="width:24px;height:24px;border-radius:5px;background:#d29922;"></span><div><div style="color:#e6edf3;">warning</div><div style="color:#6e7681;">#d29922</div></div></div>
+            <div style="display:flex; align-items:center; gap:8px;"><span style="width:24px;height:24px;border-radius:5px;background:#f85149;"></span><div><div style="color:#e6edf3;">danger</div><div style="color:#6e7681;">#f85149</div></div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Spacing + Radius -->
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+        <div style="border:1px solid var(--border); border-radius:10px; background:var(--surface); overflow:hidden;">
+          <div style="padding:12px 18px; border-bottom:1px solid var(--border-muted); font-size:12.5px; font-weight:600; color:var(--fg-muted); font-family:'IBM Plex Mono',monospace;">SPACING · 4px base</div>
+          <div style="padding:16px 18px; display:flex; flex-direction:column; gap:9px;">
+            <div style="display:flex; align-items:center; gap:12px;"><span style="width:34px; font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--fg-subtle);">4</span><span style="height:12px; width:4px; background:var(--accent); border-radius:2px;"></span></div>
+            <div style="display:flex; align-items:center; gap:12px;"><span style="width:34px; font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--fg-subtle);">8</span><span style="height:12px; width:8px; background:var(--accent); border-radius:2px;"></span></div>
+            <div style="display:flex; align-items:center; gap:12px;"><span style="width:34px; font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--fg-subtle);">12</span><span style="height:12px; width:12px; background:var(--accent); border-radius:2px;"></span></div>
+            <div style="display:flex; align-items:center; gap:12px;"><span style="width:34px; font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--fg-subtle);">16</span><span style="height:12px; width:16px; background:var(--accent); border-radius:2px;"></span></div>
+            <div style="display:flex; align-items:center; gap:12px;"><span style="width:34px; font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--fg-subtle);">24</span><span style="height:12px; width:24px; background:var(--accent); border-radius:2px;"></span></div>
+            <div style="display:flex; align-items:center; gap:12px;"><span style="width:34px; font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--fg-subtle);">32</span><span style="height:12px; width:32px; background:var(--accent); border-radius:2px;"></span></div>
+            <div style="display:flex; align-items:center; gap:12px;"><span style="width:34px; font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--fg-subtle);">48</span><span style="height:12px; width:48px; background:var(--accent); border-radius:2px;"></span></div>
+          </div>
+        </div>
+        <div style="border:1px solid var(--border); border-radius:10px; background:var(--surface); overflow:hidden;">
+          <div style="padding:12px 18px; border-bottom:1px solid var(--border-muted); font-size:12.5px; font-weight:600; color:var(--fg-muted); font-family:'IBM Plex Mono',monospace;">BORDER RADIUS</div>
+          <div style="padding:20px 18px; display:flex; gap:16px; flex-wrap:wrap; align-items:flex-end;">
+            <div style="text-align:center;"><div style="width:52px;height:52px;background:var(--accent-subtle);border:1px solid var(--accent);border-radius:4px;"></div><div style="font-family:'IBM Plex Mono',monospace; font-size:10.5px; color:var(--fg-subtle); margin-top:6px;">4 · sm</div></div>
+            <div style="text-align:center;"><div style="width:52px;height:52px;background:var(--accent-subtle);border:1px solid var(--accent);border-radius:6px;"></div><div style="font-family:'IBM Plex Mono',monospace; font-size:10.5px; color:var(--fg-subtle); margin-top:6px;">6 · md</div></div>
+            <div style="text-align:center;"><div style="width:52px;height:52px;background:var(--accent-subtle);border:1px solid var(--accent);border-radius:10px;"></div><div style="font-family:'IBM Plex Mono',monospace; font-size:10.5px; color:var(--fg-subtle); margin-top:6px;">10 · lg</div></div>
+            <div style="text-align:center;"><div style="width:52px;height:52px;background:var(--accent-subtle);border:1px solid var(--accent);border-radius:999px;"></div><div style="font-family:'IBM Plex Mono',monospace; font-size:10.5px; color:var(--fg-subtle); margin-top:6px;">pill</div></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div style="height:1px; background:var(--border-muted); margin:44px 0;"></div>
+
+    <!-- ============================ BUTTONS ============================ -->
+    <section id="buttons" style="scroll-margin-top:120px;">
+      <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--accent); font-weight:600;">Component</div>
+      <h2 style="font-size:24px; font-weight:600; margin:8px 0 20px; letter-spacing:-0.01em;">Buttons</h2>
+      <div style="border:1px solid var(--border); border-radius:10px; background:var(--surface); box-shadow:var(--shadow-sm); padding:24px; display:flex; flex-direction:column; gap:18px;">
+        <div style="display:flex; flex-wrap:wrap; gap:12px; align-items:center;">
+          <button style="height:34px; padding:0 14px; border:1px solid var(--accent); border-radius:6px; background:var(--accent); color:var(--accent-fg); font-family:inherit; font-size:13px; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:7px;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Sign document</button>
+          <button style="height:34px; padding:0 14px; border:1px solid var(--border); border-radius:6px; background:var(--surface); color:var(--fg); font-family:inherit; font-size:13px; font-weight:600; cursor:pointer;">Secondary</button>
+          <button style="height:34px; padding:0 14px; border:1px solid transparent; border-radius:6px; background:transparent; color:var(--accent); font-family:inherit; font-size:13px; font-weight:600; cursor:pointer;">Ghost</button>
+          <button style="height:34px; padding:0 14px; border:1px solid var(--danger); border-radius:6px; background:var(--danger); color:#fff; font-family:inherit; font-size:13px; font-weight:600; cursor:pointer;">Revoke</button>
+          <button disabled style="height:34px; padding:0 14px; border:1px solid var(--border); border-radius:6px; background:var(--surface-2); color:var(--fg-subtle); font-family:inherit; font-size:13px; font-weight:600; cursor:not-allowed; opacity:.7;">Disabled</button>
+          <button style="height:34px; padding:0 14px; border:1px solid var(--accent); border-radius:6px; background:var(--accent); color:var(--accent-fg); font-family:inherit; font-size:13px; font-weight:600; cursor:progress; display:inline-flex; align-items:center; gap:8px; opacity:.9;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" style="animation:spin 0.8s linear infinite;"><path d="M12 2a10 10 0 0 1 10 10"/></svg>Signing…</button>
+        </div>
+        <div style="display:flex; flex-wrap:wrap; gap:12px; align-items:center;">
+          <button style="height:28px; padding:0 10px; border:1px solid var(--accent); border-radius:6px; background:var(--accent); color:var(--accent-fg); font-family:inherit; font-size:12px; font-weight:600; cursor:pointer;">Small</button>
+          <button style="height:40px; padding:0 18px; border:1px solid var(--accent); border-radius:6px; background:var(--accent); color:var(--accent-fg); font-family:inherit; font-size:14px; font-weight:600; cursor:pointer;">Large</button>
+          <button style="width:34px; height:34px; border:1px solid var(--border); border-radius:6px; background:var(--surface); color:var(--fg-muted); cursor:pointer; display:inline-flex; align-items:center; justify-content:center;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg></button>
+          <span style="font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--fg-subtle);">primary · secondary · ghost · danger · loading · sizes sm/md/lg · icon-only</span>
+        </div>
+      </div>
+    </section>
+
+    <div style="height:1px; background:var(--border-muted); margin:44px 0;"></div>
+
+    <!-- ============================ FORMS ============================ -->
+    <section id="forms" style="scroll-margin-top:120px;">
+      <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--accent); font-weight:600;">Component</div>
+      <h2 style="font-size:24px; font-weight:600; margin:8px 0 20px; letter-spacing:-0.01em;">Forms</h2>
+      <div style="border:1px solid var(--border); border-radius:10px; background:var(--surface); box-shadow:var(--shadow-sm); padding:24px; display:grid; grid-template-columns:1fr 1fr; gap:22px;">
+        <div>
+          <label style="display:block; font-size:12.5px; font-weight:600; margin-bottom:6px;">TSA endpoint URL</label>
+          <input value="https://tsa.example.com/tsr" style="width:100%; height:36px; padding:0 12px; border:1px solid var(--border); border-radius:6px; background:var(--canvas); color:var(--fg); font-family:'IBM Plex Mono',monospace; font-size:12.5px;">
+          <div style="font-size:11.5px; color:var(--fg-muted); margin-top:6px;">RFC 3161 timestamp authority. HTTPS required.</div>
+        </div>
+        <div>
+          <label style="display:block; font-size:12.5px; font-weight:600; margin-bottom:6px;">PKCS#11 module path</label>
+          <input value="/usr/lib/softhsm/libsofthsm2.so" style="width:100%; height:36px; padding:0 12px; border:2px solid var(--danger); border-radius:6px; background:var(--canvas); color:var(--fg); font-family:'IBM Plex Mono',monospace; font-size:12.5px;">
+          <div style="font-size:11.5px; color:var(--danger); margin-top:6px; display:flex; align-items:center; gap:5px;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg>Module not found at this path.</div>
+        </div>
+        <div>
+          <label style="display:block; font-size:12.5px; font-weight:600; margin-bottom:6px;">Signature standard</label>
+          <div style="position:relative;">
+            <select style="width:100%; height:36px; padding:0 12px; border:1px solid var(--border); border-radius:6px; background:var(--canvas); color:var(--fg); font-family:inherit; font-size:13px; appearance:none; cursor:pointer;"><option>PAdES-LTA</option><option>CAdES-LT</option><option>XAdES-T</option></select>
+            <span style="position:absolute; right:10px; top:10px; color:var(--fg-muted); pointer-events:none;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></span>
+          </div>
+        </div>
+        <div>
+          <label style="display:block; font-size:12.5px; font-weight:600; margin-bottom:6px;">Notes</label>
+          <textarea style="width:100%; height:36px; min-height:36px; padding:8px 12px; border:1px solid var(--border); border-radius:6px; background:var(--canvas); color:var(--fg); font-family:inherit; font-size:13px; resize:vertical;">Batch run for Q3 statements.</textarea>
+        </div>
+        <div style="display:flex; gap:22px; align-items:center; flex-wrap:wrap;">
+          <label style="display:inline-flex; align-items:center; gap:8px; font-size:13px; cursor:pointer;"><span style="width:16px;height:16px;border-radius:4px;background:var(--accent);border:1px solid var(--accent); display:inline-flex; align-items:center; justify-content:center; color:#fff;"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>Embed LTV data</label>
+          <label style="display:inline-flex; align-items:center; gap:8px; font-size:13px; cursor:pointer;"><span style="width:16px;height:16px;border-radius:4px;background:var(--canvas);border:1px solid var(--border);"></span>Visible signature</label>
+          <label style="display:inline-flex; align-items:center; gap:8px; font-size:13px; cursor:pointer;"><span style="width:16px;height:16px;border-radius:999px;background:var(--canvas);border:5px solid var(--accent); box-shadow:inset 0 0 0 2px var(--canvas);"></span>Detached</label>
+        </div>
+        <div style="display:flex; gap:22px; align-items:center;">
+          <label style="display:inline-flex; align-items:center; gap:9px; font-size:13px; cursor:pointer;"><span style="width:34px;height:20px;border-radius:999px;background:var(--accent); position:relative; display:inline-block;"><span style="position:absolute; top:2px; right:2px; width:16px;height:16px;border-radius:50%;background:#fff;"></span></span>FIPS 140-3 mode</label>
+          <label style="display:inline-flex; align-items:center; gap:9px; font-size:13px; cursor:pointer; color:var(--fg-muted);"><span style="width:34px;height:20px;border-radius:999px;background:var(--inset); position:relative; display:inline-block;"><span style="position:absolute; top:2px; left:2px; width:16px;height:16px;border-radius:50%;background:var(--surface); box-shadow:var(--shadow-sm);"></span></span>Allow soft keys</label>
+        </div>
+      </div>
+    </section>
+
+    <div style="height:1px; background:var(--border-muted); margin:44px 0;"></div>
+
+    <!-- ============================ CARDS ============================ -->
+    <section id="cards" style="scroll-margin-top:120px;">
+      <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--accent); font-weight:600;">Component</div>
+      <h2 style="font-size:24px; font-weight:600; margin:8px 0 20px; letter-spacing:-0.01em;">Cards</h2>
+      <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:16px;">
+        <div style="border:1px solid var(--border); border-radius:10px; background:var(--surface); box-shadow:var(--shadow-sm); overflow:hidden;">
+          <div style="padding:14px 16px; border-bottom:1px solid var(--border-muted); display:flex; align-items:center; gap:9px;"><span style="color:var(--accent);"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="8" x="2" y="2" rx="2"/><rect width="20" height="8" x="2" y="14" rx="2"/><path d="M6 6h.01"/><path d="M6 18h.01"/></svg></span><span style="font-weight:600; font-size:14px;">Remote HSM</span></div>
+          <div style="padding:14px 16px; font-size:12.5px; color:var(--fg-muted); line-height:1.55;">Luna Network HSM 7 · partition 3. 2 signing keys discovered.</div>
+          <div style="padding:12px 16px; border-top:1px solid var(--border-muted); background:var(--surface-2); display:flex; justify-content:space-between; align-items:center;"><span style="font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--success);">● Connected</span><a href="#" style="font-size:12px; font-weight:600;">Manage</a></div>
+        </div>
+        <div style="border:1px solid var(--border); border-radius:10px; background:var(--surface); box-shadow:var(--shadow-sm); padding:16px;">
+          <div style="font-size:11.5px; font-family:'IBM Plex Mono',monospace; color:var(--fg-muted); letter-spacing:.05em;">SIGNATURES TODAY</div>
+          <div style="font-size:32px; font-weight:600; letter-spacing:-0.02em; margin:6px 0 2px;">48,912</div>
+          <div style="font-size:12px; color:var(--success); display:flex; align-items:center; gap:4px;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg>+12.4% vs yesterday</div>
+        </div>
+        <div style="border:1px solid var(--accent); border-radius:10px; background:var(--accent-subtle); padding:16px; cursor:pointer;">
+          <div style="display:flex; align-items:center; gap:9px; color:var(--accent);"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg><span style="font-weight:600; font-size:14px;">New signing job</span></div>
+          <div style="font-size:12.5px; color:var(--fg-muted); margin-top:8px; line-height:1.5;">Interactive card · full row is the hit target.</div>
+        </div>
+      </div>
+    </section>
+
+    <div style="height:1px; background:var(--border-muted); margin:44px 0;"></div>
+
+    <!-- ============================ TABLES ============================ -->
+    <section id="tables" style="scroll-margin-top:120px;">
+      <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--accent); font-weight:600;">Component</div>
+      <h2 style="font-size:24px; font-weight:600; margin:8px 0 20px; letter-spacing:-0.01em;">Tables</h2>
+      <div style="border:1px solid var(--border); border-radius:10px; background:var(--surface); box-shadow:var(--shadow-sm); overflow:hidden;">
+        <div style="display:grid; grid-template-columns:28px 2fr 1.4fr 1fr 1fr 90px; align-items:center; padding:10px 16px; background:var(--surface-2); border-bottom:1px solid var(--border); font-size:11px; font-family:'IBM Plex Mono',monospace; letter-spacing:.05em; color:var(--fg-muted); font-weight:600;">
+          <span style="width:15px;height:15px;border:1px solid var(--border);border-radius:4px;"></span>
+          <span style="display:inline-flex; align-items:center; gap:4px;">DOCUMENT<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></span>
+          <span>SIGNER</span><span>STANDARD</span><span>STATUS</span><span>DATE</span>
+        </div>
+        <div style="display:grid; grid-template-columns:28px 2fr 1.4fr 1fr 1fr 90px; align-items:center; padding:12px 16px; border-bottom:1px solid var(--border-muted); font-size:13px;"><span style="width:15px;height:15px;border:1px solid var(--border);border-radius:4px;"></span><span style="display:flex; align-items:center; gap:8px;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--fg-muted)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v5h5"/></svg>Q3-statement.pdf</span><span style="color:var(--fg-muted);">a.torres</span><span style="font-family:'IBM Plex Mono',monospace; font-size:12px; color:var(--fg-muted);">PAdES-LTA</span><span><span style="display:inline-flex; align-items:center; gap:5px; font-size:11.5px; font-weight:600; color:var(--success); background:var(--success-subtle); padding:2px 8px; border-radius:999px;">● Valid</span></span><span style="color:var(--fg-muted); font-size:12px;">Jul 09</span></div>
+        <div style="display:grid; grid-template-columns:28px 2fr 1.4fr 1fr 1fr 90px; align-items:center; padding:12px 16px; border-bottom:1px solid var(--border-muted); font-size:13px; background:var(--surface-2);"><span style="width:15px;height:15px;border:1px solid var(--border);border-radius:4px;"></span><span style="display:flex; align-items:center; gap:8px;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--fg-muted)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v5h5"/></svg>contract-v4.docx</span><span style="color:var(--fg-muted);">m.chen</span><span style="font-family:'IBM Plex Mono',monospace; font-size:12px; color:var(--fg-muted);">CAdES-LT</span><span><span style="display:inline-flex; align-items:center; gap:5px; font-size:11.5px; font-weight:600; color:var(--warning); background:var(--warning-subtle); padding:2px 8px; border-radius:999px;">● Pending</span></span><span style="color:var(--fg-muted); font-size:12px;">Jul 09</span></div>
+        <div style="display:grid; grid-template-columns:28px 2fr 1.4fr 1fr 1fr 90px; align-items:center; padding:12px 16px; font-size:13px;"><span style="width:15px;height:15px;border:1px solid var(--border);border-radius:4px;"></span><span style="display:flex; align-items:center; gap:8px;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--fg-muted)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v5h5"/></svg>ledger.xml</span><span style="color:var(--fg-muted);">svc-batch</span><span style="font-family:'IBM Plex Mono',monospace; font-size:12px; color:var(--fg-muted);">XAdES-T</span><span><span style="display:inline-flex; align-items:center; gap:5px; font-size:11.5px; font-weight:600; color:var(--danger); background:var(--danger-subtle); padding:2px 8px; border-radius:999px;">● Invalid</span></span><span style="color:var(--fg-muted); font-size:12px;">Jul 08</span></div>
+      </div>
+    </section>
+
+    <div style="height:1px; background:var(--border-muted); margin:44px 0;"></div>
+
+    <!-- ============================ DIALOGS + TABS ============================ -->
+    <section id="dialogs" style="scroll-margin-top:120px;">
+      <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--accent); font-weight:600;">Component</div>
+      <h2 style="font-size:24px; font-weight:600; margin:8px 0 20px; letter-spacing:-0.01em;">Dialogs</h2>
+      <div style="border:1px solid var(--border); border-radius:10px; background:var(--overlay); padding:40px; display:flex; justify-content:center;">
+        <div style="width:420px; border:1px solid var(--border); border-radius:12px; background:var(--surface); box-shadow:var(--shadow-md); overflow:hidden;">
+          <div style="padding:18px 20px 0; display:flex; gap:12px; align-items:flex-start;">
+            <span style="width:34px;height:34px;border-radius:8px;background:var(--danger-subtle);color:var(--danger); display:inline-flex; align-items:center; justify-content:center; flex-shrink:0;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.46 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg></span>
+            <div><div style="font-size:16px; font-weight:600;">Revoke certificate?</div><p style="font-size:13px; color:var(--fg-muted); line-height:1.55; margin:6px 0 0;">This certificate is bound to <strong style="color:var(--fg);">2 active signing policies</strong>. Revoking it will halt those jobs. This cannot be undone.</p></div>
+          </div>
+          <div style="padding:18px 20px; display:flex; justify-content:flex-end; gap:10px;">
+            <button style="height:34px; padding:0 14px; border:1px solid var(--border); border-radius:6px; background:var(--surface); color:var(--fg); font-family:inherit; font-size:13px; font-weight:600; cursor:pointer;">Cancel</button>
+            <button style="height:34px; padding:0 14px; border:1px solid var(--danger); border-radius:6px; background:var(--danger); color:#fff; font-family:inherit; font-size:13px; font-weight:600; cursor:pointer;">Revoke certificate</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="tabs" style="scroll-margin-top:120px; margin-top:36px;">
+      <h2 style="font-size:24px; font-weight:600; margin:8px 0 20px; letter-spacing:-0.01em;">Tabs</h2>
+      <div style="border:1px solid var(--border); border-radius:10px; background:var(--surface); box-shadow:var(--shadow-sm); padding:20px;">
+        <div style="display:flex; gap:4px; border-bottom:1px solid var(--border); margin-bottom:18px;">
+          <span style="padding:9px 14px; font-size:13px; font-weight:600; color:var(--accent); border-bottom:2px solid var(--accent); margin-bottom:-1px;">Details</span>
+          <span style="padding:9px 14px; font-size:13px; font-weight:500; color:var(--fg-muted); cursor:pointer;">Chain</span>
+          <span style="padding:9px 14px; font-size:13px; font-weight:500; color:var(--fg-muted); cursor:pointer;">Revocation</span>
+          <span style="padding:9px 14px; font-size:13px; font-weight:500; color:var(--fg-muted); cursor:pointer;">Audit</span>
+        </div>
+        <div style="display:inline-flex; padding:3px; background:var(--inset); border-radius:8px; gap:2px;">
+          <span style="padding:5px 12px; font-size:12.5px; font-weight:600; background:var(--surface); color:var(--fg); border-radius:6px; box-shadow:var(--shadow-sm);">Light</span>
+          <span style="padding:5px 12px; font-size:12.5px; font-weight:500; color:var(--fg-muted); cursor:pointer;">Dark</span>
+          <span style="padding:5px 12px; font-size:12.5px; font-weight:500; color:var(--fg-muted); cursor:pointer;">System</span>
+        </div>
+      </div>
+    </section>
+
+    <div style="height:1px; background:var(--border-muted); margin:44px 0;"></div>
+
+    <!-- ============================ TREES + CERT ============================ -->
+    <section id="trees" style="scroll-margin-top:120px;">
+      <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--accent); font-weight:600;">Component</div>
+      <h2 style="font-size:24px; font-weight:600; margin:8px 0 20px; letter-spacing:-0.01em;">Trees &amp; Certificate Viewer</h2>
+      <div style="display:grid; grid-template-columns:300px 1fr; gap:16px;">
+
+        <!-- tree -->
+        <div style="border:1px solid var(--border); border-radius:10px; background:var(--surface); box-shadow:var(--shadow-sm); padding:10px; font-size:13px;">
+          <div style="display:flex; align-items:center; gap:6px; padding:6px 8px; border-radius:6px;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--fg-muted)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg><span style="font-weight:600;">Remote HSM</span></div>
+          <div style="padding-left:18px;">
+            <div style="display:flex; align-items:center; gap:6px; padding:6px 8px; border-radius:6px;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--fg-muted)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--fg-muted)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg>Partition 3</div>
+            <div style="padding-left:18px;">
+              <div style="display:flex; align-items:center; gap:6px; padding:6px 8px; border-radius:6px; background:var(--accent-subtle);"><span style="width:15px;"></span><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="15" r="4"/><path d="m10.85 12.15 8-8 2 2"/><path d="m16 5 2 2"/></svg><span style="color:var(--accent); font-weight:600;">signing-key-01</span></div>
+              <div style="display:flex; align-items:center; gap:6px; padding:6px 8px; border-radius:6px;"><span style="width:15px;"></span><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--fg-muted)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="15" r="4"/><path d="m10.85 12.15 8-8 2 2"/><path d="m16 5 2 2"/></svg>signing-key-02</div>
+            </div>
+          </div>
+          <div style="display:flex; align-items:center; gap:6px; padding:6px 8px; border-radius:6px; color:var(--fg-muted);"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg>Cloud KMS</div>
+        </div>
+
+        <!-- cert viewer -->
+        <div id="cert" style="scroll-margin-top:120px; border:1px solid var(--border); border-radius:10px; background:var(--surface); box-shadow:var(--shadow-sm); overflow:hidden;">
+          <div style="padding:16px 18px; border-bottom:1px solid var(--border-muted); display:flex; align-items:center; gap:12px;">
+            <span style="width:38px;height:38px;border-radius:9px;background:var(--success-subtle);color:var(--success); display:inline-flex; align-items:center; justify-content:center;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg></span>
+            <div style="flex:1;"><div style="font-weight:600; font-size:15px;">Alicia Torres</div><div style="font-size:12px; color:var(--fg-muted); font-family:'IBM Plex Mono',monospace;">CN=a.torres, O=Treasury Dept</div></div>
+            <span style="display:inline-flex; align-items:center; gap:5px; font-size:11.5px; font-weight:600; color:var(--success); background:var(--success-subtle); padding:3px 10px; border-radius:999px;">● Trusted</span>
+          </div>
+          <div style="padding:14px 18px; display:grid; grid-template-columns:1fr 1fr; gap:12px 24px; font-size:12.5px;">
+            <div><div style="font-family:'IBM Plex Mono',monospace; font-size:10.5px; color:var(--fg-subtle); letter-spacing:.05em;">ISSUER</div><div style="margin-top:2px;">Gov Root CA G3</div></div>
+            <div><div style="font-family:'IBM Plex Mono',monospace; font-size:10.5px; color:var(--fg-subtle); letter-spacing:.05em;">SERIAL</div><div style="margin-top:2px; font-family:'IBM Plex Mono',monospace;">0x4B:9A:F2:1C</div></div>
+            <div><div style="font-family:'IBM Plex Mono',monospace; font-size:10.5px; color:var(--fg-subtle); letter-spacing:.05em;">VALID FROM</div><div style="margin-top:2px;">2024-01-15</div></div>
+            <div><div style="font-family:'IBM Plex Mono',monospace; font-size:10.5px; color:var(--fg-subtle); letter-spacing:.05em;">VALID TO</div><div style="margin-top:2px;">2027-01-15</div></div>
+            <div style="grid-column:1 / -1;"><div style="font-family:'IBM Plex Mono',monospace; font-size:10.5px; color:var(--fg-subtle); letter-spacing:.05em;">SHA-256 FINGERPRINT</div><div style="margin-top:2px; font-family:'IBM Plex Mono',monospace; font-size:11.5px; word-break:break-all;">3f9a c012 88de 41b7 a9f0 6c2d ee31 <span style="color:var(--fg-muted);">…</span></div></div>
+          </div>
+          <div style="padding:12px 18px; border-top:1px solid var(--border-muted); background:var(--surface-2);">
+            <div style="font-family:'IBM Plex Mono',monospace; font-size:10.5px; color:var(--fg-subtle); letter-spacing:.05em; margin-bottom:8px;">TRUST CHAIN</div>
+            <div style="display:flex; align-items:center; gap:8px; font-size:12px; color:var(--fg-muted);"><span style="color:var(--success);">●</span>Gov Root CA G3<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg><span style="color:var(--success);">●</span>Treasury Issuing CA<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg><span style="color:var(--fg); font-weight:600;">a.torres</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div style="height:1px; background:var(--border-muted); margin:44px 0;"></div>
+
+    <!-- ============================ TIMELINE + STATUS ============================ -->
+    <section id="timeline" style="scroll-margin-top:120px;">
+      <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--accent); font-weight:600;">Component</div>
+      <h2 style="font-size:24px; font-weight:600; margin:8px 0 20px; letter-spacing:-0.01em;">Timeline &amp; Status</h2>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+        <div style="border:1px solid var(--border); border-radius:10px; background:var(--surface); box-shadow:var(--shadow-sm); padding:20px;">
+          <div style="position:relative; padding-left:26px;">
+            <div style="position:absolute; left:6px; top:4px; bottom:4px; width:2px; background:var(--border);"></div>
+            <div style="position:relative; margin-bottom:18px;"><span style="position:absolute; left:-26px; top:0; width:14px;height:14px;border-radius:50%;background:var(--success); border:3px solid var(--surface); box-shadow:0 0 0 1px var(--success);"></span><div style="font-size:13px; font-weight:600;">Signature created</div><div style="font-size:11.5px; color:var(--fg-muted); font-family:'IBM Plex Mono',monospace;">14:02:11 · PAdES-B</div></div>
+            <div style="position:relative; margin-bottom:18px;"><span style="position:absolute; left:-26px; top:0; width:14px;height:14px;border-radius:50%;background:var(--success); border:3px solid var(--surface); box-shadow:0 0 0 1px var(--success);"></span><div style="font-size:13px; font-weight:600;">Timestamp applied</div><div style="font-size:11.5px; color:var(--fg-muted); font-family:'IBM Plex Mono',monospace;">14:02:12 · TSA verified</div></div>
+            <div style="position:relative; margin-bottom:18px;"><span style="position:absolute; left:-26px; top:0; width:14px;height:14px;border-radius:50%;background:var(--success); border:3px solid var(--surface); box-shadow:0 0 0 1px var(--success);"></span><div style="font-size:13px; font-weight:600;">LTV data embedded</div><div style="font-size:11.5px; color:var(--fg-muted); font-family:'IBM Plex Mono',monospace;">14:02:13 · OCSP + CRL</div></div>
+            <div style="position:relative;"><span style="position:absolute; left:-26px; top:0; width:14px;height:14px;border-radius:50%;background:var(--accent); border:3px solid var(--surface); box-shadow:0 0 0 1px var(--accent); animation:spin 2s linear infinite;"></span><div style="font-size:13px; font-weight:600;">Archiving (LTA)</div><div style="font-size:11.5px; color:var(--fg-muted); font-family:'IBM Plex Mono',monospace;">in progress…</div></div>
+          </div>
+        </div>
+        <div id="status" style="scroll-margin-top:120px; border:1px solid var(--border); border-radius:10px; background:var(--surface); box-shadow:var(--shadow-sm); padding:20px; display:flex; flex-direction:column; gap:14px;">
+          <div style="display:flex; flex-wrap:wrap; gap:8px;">
+            <span style="display:inline-flex; align-items:center; gap:5px; font-size:11.5px; font-weight:600; color:var(--success); background:var(--success-subtle); padding:3px 10px; border-radius:999px;">● Valid</span>
+            <span style="display:inline-flex; align-items:center; gap:5px; font-size:11.5px; font-weight:600; color:var(--warning); background:var(--warning-subtle); padding:3px 10px; border-radius:999px;">● Pending</span>
+            <span style="display:inline-flex; align-items:center; gap:5px; font-size:11.5px; font-weight:600; color:var(--danger); background:var(--danger-subtle); padding:3px 10px; border-radius:999px;">● Invalid</span>
+            <span style="display:inline-flex; align-items:center; gap:5px; font-size:11.5px; font-weight:600; color:var(--fg-muted); background:var(--inset); padding:3px 10px; border-radius:999px;">● Expired</span>
+            <span style="display:inline-flex; align-items:center; gap:5px; font-size:11.5px; font-weight:600; color:var(--danger); background:var(--danger-subtle); padding:3px 10px; border-radius:999px;">⊘ Revoked</span>
+          </div>
+          <div style="display:flex; flex-direction:column; gap:10px; font-size:13px;">
+            <div style="display:flex; align-items:center; gap:8px;"><span style="width:8px;height:8px;border-radius:50%;background:var(--success);"></span>HSM · online</div>
+            <div style="display:flex; align-items:center; gap:8px;"><span style="width:8px;height:8px;border-radius:50%;background:var(--warning);"></span>TSA · degraded latency</div>
+            <div style="display:flex; align-items:center; gap:8px;"><span style="width:8px;height:8px;border-radius:50%;background:var(--danger);"></span>Remote CA · unreachable</div>
+            <div style="display:flex; align-items:center; gap:8px;"><span style="width:8px;height:8px;border-radius:50%;background:var(--fg-subtle);"></span>Cloud KMS · not configured</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div style="height:1px; background:var(--border-muted); margin:44px 0;"></div>
+
+    <!-- ============================ CHARTS + PROGRESS ============================ -->
+    <section id="charts" style="scroll-margin-top:120px;">
+      <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--accent); font-weight:600;">Component</div>
+      <h2 style="font-size:24px; font-weight:600; margin:8px 0 20px; letter-spacing:-0.01em;">Charts &amp; Progress</h2>
+      <div style="display:grid; grid-template-columns:1.3fr 1fr 1fr; gap:16px;">
+        <!-- line/area -->
+        <div style="border:1px solid var(--border); border-radius:10px; background:var(--surface); box-shadow:var(--shadow-sm); padding:16px;">
+          <div style="font-size:11.5px; font-family:'IBM Plex Mono',monospace; color:var(--fg-muted); margin-bottom:10px;">SIGNATURES / HR</div>
+          <svg width="100%" height="90" viewBox="0 0 260 90" preserveAspectRatio="none">
+            <polyline points="0,70 40,55 80,60 120,35 160,42 200,20 260,28" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+            <polyline points="0,70 40,55 80,60 120,35 160,42 200,20 260,28 260,90 0,90" fill="var(--accent-subtle)" stroke="none" opacity="0.6"/>
+          </svg>
+        </div>
+        <!-- bars -->
+        <div style="border:1px solid var(--border); border-radius:10px; background:var(--surface); box-shadow:var(--shadow-sm); padding:16px;">
+          <div style="font-size:11.5px; font-family:'IBM Plex Mono',monospace; color:var(--fg-muted); margin-bottom:10px;">BY STANDARD</div>
+          <div style="display:flex; align-items:flex-end; gap:10px; height:90px;">
+            <div style="flex:1; height:80%; background:var(--accent); border-radius:4px 4px 0 0;"></div>
+            <div style="flex:1; height:55%; background:var(--accent); border-radius:4px 4px 0 0; opacity:.8;"></div>
+            <div style="flex:1; height:40%; background:var(--accent); border-radius:4px 4px 0 0; opacity:.6;"></div>
+            <div style="flex:1; height:25%; background:var(--accent); border-radius:4px 4px 0 0; opacity:.45;"></div>
+          </div>
+        </div>
+        <!-- donut -->
+        <div style="border:1px solid var(--border); border-radius:10px; background:var(--surface); box-shadow:var(--shadow-sm); padding:16px; display:flex; flex-direction:column; align-items:center;">
+          <div style="font-size:11.5px; font-family:'IBM Plex Mono',monospace; color:var(--fg-muted); margin-bottom:10px; align-self:flex-start;">KEY SOURCES</div>
+          <div style="width:84px;height:84px;border-radius:50%; background:conic-gradient(var(--accent) 0 55%, var(--success) 55% 80%, var(--warning) 80% 100%); display:flex; align-items:center; justify-content:center;"><div style="width:52px;height:52px;border-radius:50%;background:var(--surface); display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:600;">3</div></div>
+        </div>
+      </div>
+
+      <div id="progress" style="scroll-margin-top:120px; border:1px solid var(--border); border-radius:10px; background:var(--surface); box-shadow:var(--shadow-sm); padding:20px; margin-top:16px; display:grid; grid-template-columns:1fr 1fr; gap:24px; align-items:center;">
+        <div style="display:flex; flex-direction:column; gap:16px;">
+          <div><div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:6px;"><span style="color:var(--fg-muted);">Batch · Q3 statements</span><span style="font-family:'IBM Plex Mono',monospace;">68%</span></div><div style="height:8px; background:var(--inset); border-radius:999px; overflow:hidden;"><div style="width:68%; height:100%; background:var(--accent); border-radius:999px;"></div></div><div style="font-size:11px; color:var(--fg-muted); margin-top:5px; font-family:'IBM Plex Mono',monospace;">33,260 / 48,912 signed · 4 failed</div></div>
+          <div><div style="font-size:12px; margin-bottom:6px; color:var(--fg-muted);">Indeterminate</div><div style="height:8px; background:var(--inset); border-radius:999px; overflow:hidden; position:relative;"><div style="position:absolute; top:0; width:40%; height:100%; background:var(--accent); border-radius:999px; animation:indet 1.3s ease-in-out infinite;"></div></div></div>
+        </div>
+        <div style="display:flex; gap:24px; justify-content:center;">
+          <div style="position:relative; width:78px; height:78px;">
+            <svg width="78" height="78" viewBox="0 0 78 78"><circle cx="39" cy="39" r="33" fill="none" stroke="var(--inset)" stroke-width="7"/><circle cx="39" cy="39" r="33" fill="none" stroke="var(--accent)" stroke-width="7" stroke-linecap="round" stroke-dasharray="207" stroke-dashoffset="66" transform="rotate(-90 39 39)"/></svg>
+            <div style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:15px; font-weight:600;">68%</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div style="height:1px; background:var(--border-muted); margin:44px 0;"></div>
+
+    <!-- ============================ FILE UPLOAD ============================ -->
+    <section id="upload" style="scroll-margin-top:120px;">
+      <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--accent); font-weight:600;">Component</div>
+      <h2 style="font-size:24px; font-weight:600; margin:8px 0 20px; letter-spacing:-0.01em;">File Upload</h2>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+        <div style="border:2px dashed var(--border); border-radius:10px; background:var(--surface-2); padding:32px 20px; display:flex; flex-direction:column; align-items:center; text-align:center; gap:10px;">
+          <span style="width:44px;height:44px;border-radius:10px;background:var(--accent-subtle);color:var(--accent); display:inline-flex; align-items:center; justify-content:center;"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/></svg></span>
+          <div style="font-size:14px; font-weight:600;">Drop files to sign</div>
+          <div style="font-size:12px; color:var(--fg-muted);">PDF · XML · OOXML · binary · up to 5 GB</div>
+          <button style="height:32px; padding:0 14px; border:1px solid var(--border); border-radius:6px; background:var(--surface); color:var(--fg); font-family:inherit; font-size:12.5px; font-weight:600; cursor:pointer; margin-top:4px;">Browse files</button>
+        </div>
+        <div style="border:1px solid var(--border); border-radius:10px; background:var(--surface); box-shadow:var(--shadow-sm); padding:12px; display:flex; flex-direction:column; gap:8px;">
+          <div style="display:flex; align-items:center; gap:10px; padding:8px 10px; border:1px solid var(--border-muted); border-radius:8px;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--fg-muted)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v5h5"/></svg><div style="flex:1;"><div style="font-size:12.5px; font-weight:500;">Q3-statement.pdf</div><div style="height:4px; background:var(--inset); border-radius:999px; margin-top:5px; overflow:hidden;"><div style="width:100%; height:100%; background:var(--success);"></div></div></div><span style="color:var(--success);"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span></div>
+          <div style="display:flex; align-items:center; gap:10px; padding:8px 10px; border:1px solid var(--border-muted); border-radius:8px;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--fg-muted)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v5h5"/></svg><div style="flex:1;"><div style="font-size:12.5px; font-weight:500;">ledger-2024.xml</div><div style="height:4px; background:var(--inset); border-radius:999px; margin-top:5px; overflow:hidden;"><div style="width:47%; height:100%; background:var(--accent);"></div></div></div><span style="font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--fg-muted);">47%</span></div>
+          <div style="display:flex; align-items:center; gap:10px; padding:8px 10px; border:1px solid var(--danger); border-radius:8px; background:var(--danger-subtle);"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--danger)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v5h5"/></svg><div style="flex:1;"><div style="font-size:12.5px; font-weight:500;">huge.iso</div><div style="font-size:11px; color:var(--danger); margin-top:2px;">Exceeds 5 GB limit</div></div><span style="color:var(--danger); cursor:pointer;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></span></div>
+        </div>
+      </div>
+    </section>
+
+    <div style="height:1px; background:var(--border-muted); margin:44px 0;"></div>
+
+    <!-- ============================ DEV CONSOLE ============================ -->
+    <section id="console" style="scroll-margin-top:120px;">
+      <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--accent); font-weight:600;">Component</div>
+      <h2 style="font-size:24px; font-weight:600; margin:8px 0 20px; letter-spacing:-0.01em;">Developer Console</h2>
+      <div style="border:1px solid var(--border); border-radius:10px; overflow:hidden; box-shadow:var(--shadow-sm);">
+        <!-- api key row -->
+        <div style="padding:14px 18px; background:var(--surface); border-bottom:1px solid var(--border); display:flex; align-items:center; gap:12px;">
+          <span style="display:inline-flex; align-items:center; gap:5px; font-size:11px; font-weight:600; color:var(--warning); background:var(--warning-subtle); padding:2px 8px; border-radius:5px;">SANDBOX</span>
+          <code style="flex:1; font-family:'IBM Plex Mono',monospace; font-size:12.5px; color:var(--fg);">sk_test_4f9a••••••••••••c012</code>
+          <button style="height:30px; padding:0 11px; border:1px solid var(--border); border-radius:6px; background:var(--surface-2); color:var(--fg); font-family:inherit; font-size:12px; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:6px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>Copy</button>
+        </div>
+        <!-- code -->
+        <div style="background:#0d1117; padding:16px 18px; font-family:'IBM Plex Mono',monospace; font-size:12.5px; line-height:1.7; overflow-x:auto;">
+          <div><span style="color:#3fb950; font-weight:600;">POST</span> <span style="color:#e6edf3;">/v1/sign</span></div>
+          <div style="color:#6e7681;">Authorization: Bearer sk_test_…</div>
+          <div style="color:#e6edf3;">{</div>
+          <div style="color:#e6edf3; padding-left:18px;"><span style="color:#79c0ff;">"standard"</span>: <span style="color:#a5d6ff;">"PAdES-LTA"</span>,</div>
+          <div style="color:#e6edf3; padding-left:18px;"><span style="color:#79c0ff;">"key_source"</span>: <span style="color:#a5d6ff;">"hsm-luna-p3"</span>,</div>
+          <div style="color:#e6edf3; padding-left:18px;"><span style="color:#79c0ff;">"document"</span>: <span style="color:#a5d6ff;">"@Q3-statement.pdf"</span></div>
+          <div style="color:#e6edf3;">}</div>
+          <div style="height:10px;"></div>
+          <div><span style="color:#3fb950;">← 200 OK</span> <span style="color:#6e7681;">· 412 ms</span></div>
+          <div style="color:#e6edf3;">{ <span style="color:#79c0ff;">"status"</span>: <span style="color:#a5d6ff;">"valid"</span>, <span style="color:#79c0ff;">"signature_id"</span>: <span style="color:#a5d6ff;">"sig_9f2c…"</span> }</div>
+        </div>
+      </div>
+      <div style="display:flex; gap:8px; margin-top:14px; flex-wrap:wrap;">
+        <span style="font-family:'IBM Plex Mono',monospace; font-size:11px; font-weight:600; color:var(--success); background:var(--success-subtle); padding:3px 9px; border-radius:5px;">GET</span>
+        <span style="font-family:'IBM Plex Mono',monospace; font-size:11px; font-weight:600; color:var(--accent); background:var(--accent-subtle); padding:3px 9px; border-radius:5px;">POST</span>
+        <span style="font-family:'IBM Plex Mono',monospace; font-size:11px; font-weight:600; color:var(--warning); background:var(--warning-subtle); padding:3px 9px; border-radius:5px;">PUT</span>
+        <span style="font-family:'IBM Plex Mono',monospace; font-size:11px; font-weight:600; color:var(--danger); background:var(--danger-subtle); padding:3px 9px; border-radius:5px;">DELETE</span>
+      </div>
+    </section>
+
+    <div style="margin-top:56px; padding-top:20px; border-top:1px solid var(--border-muted); display:flex; justify-content:space-between; font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--fg-subtle);">
+      <span>Sigil — Design System v1.0</span>
+      <span>Light + Dark · IBM Plex · Lucide-style icons</span>
+    </div>
+
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1160,&quot;height&quot;:900}}">
+class Component extends DCLogic {
+  state = { theme: 'light' };
+  componentDidMount() {
+    document.documentElement.setAttribute('data-theme', this.state.theme);
+  }
+  componentDidUpdate() {
+    document.documentElement.setAttribute('data-theme', this.state.theme);
+  }
+  renderVals() {
+    const dark = this.state.theme === 'dark';
+    return {
+      theme: this.state.theme,
+      themeLabel: dark ? 'Dark' : 'Light',
+      toggle: () => this.setState(s => ({ theme: s.theme === 'dark' ? 'light' : 'dark' })),
+    };
+  }
+}
+</script>
+</body>
+</html>

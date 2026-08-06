@@ -322,6 +322,47 @@ export const en = {
       resume: "Resume",
       dismiss: "Dismiss",
     },
+    /** Wizard chrome: progress bar labels and the per-step framing text. */
+    steps: {
+      navLabel: "Signing steps",
+      stepOf: (current: number, total: number) => `Step ${current} of ${total}`,
+      back: "Back",
+      next: "Continue",
+      lockedHint: "Finish the earlier steps to unlock this one.",
+      document: {
+        label: "Document",
+        description: "The file format decides which signature sources can be used next.",
+      },
+      source: {
+        label: "Source",
+        description:
+          "Sources that cannot sign this format stay listed but disabled, with the reason shown.",
+      },
+      credential: {
+        label: "Credentials",
+        description: "What this source needs from you before it can reach a private key.",
+      },
+      signature: {
+        label: "Signature",
+        description: "Baseline level, algorithm and how the signature appears on the document.",
+      },
+      review: {
+        label: "Review",
+        description: "Check the configuration, then send the signing request.",
+      },
+      summaryTitle: "Ready to sign",
+      summaryDocument: "Document",
+      summaryFormat: "Format",
+      summarySource: "Source",
+      summaryProfile: "Profile",
+      summaryAppearance: "Visible signature",
+      summaryOn: "On",
+      summaryOff: "Off",
+      summaryUnset: "—",
+      restart: "Start over",
+      restartHint:
+        "Clears the document, the key material and every choice — the page returns to the state it had when you opened it. Download the signed file first: it only exists on this page.",
+    },
     document: {
       sectionTitle: "Document",
       dropHere: "Drop a document here",
@@ -345,6 +386,9 @@ export const en = {
     },
     preview: {
       title: "Preview",
+      /** Shown once the preview switches from the original file to the signed one. */
+      signedTitle: "Signed document",
+      signedBadge: "Signed",
       unknownType: "Unknown type",
       emptyTitle: "No document selected",
       emptyDescription: "Choose a document to inspect the signing preview.",
@@ -379,6 +423,18 @@ export const en = {
       timestampNote:
         "Baseline T always calls the TSA, regardless of SIGNING_TSA_ENABLED. If signing fails with SIGNING_FAILED, try baseline B to tell a TSA problem apart from a signing problem.",
       algorithmLabel: "Signature algorithm",
+      /** `<optgroup>` labels. Per-algorithm labels come from algorithmCatalog. */
+      algorithmScheme: {
+        RSASSA_PSS: "RSA-PSS (recommended)",
+        RSA_PKCS1_V1_5: "RSA PKCS#1 v1.5 (widest compatibility)",
+        ECDSA: "ECDSA (needs an EC-key certificate)",
+      } as Record<string, string>,
+      algorithmNone: "This source declares no algorithms.",
+      algorithmNoneForFormat: (format: string) => `This source cannot sign ${format} files.`,
+      algorithmFormatNote: (format: string) =>
+        `${format} can only be signed with RSA PKCS#1 v1.5: ECMA-376 Part 2 defines no RSA-PSS or ECDSA for package signatures, and Word/Excel cannot read them. That is a format limit, not a service limit.`,
+      algorithmEcNote:
+        "ECDSA needs a certificate with an EC key. This cannot be checked up front — the key type is only readable after the key file is opened with its password. An RSA-key certificate will fail with ALGORITHM_KEY_TYPE_MISMATCH at signing time.",
       signatureTypeLabel: "Signature type",
       coSign: "Co-sign",
       counterSign: "Counter-sign",
@@ -526,6 +582,8 @@ export const en = {
       agentReady: (count: number) =>
         `Signing Agent answered — ${count} certificate${count === 1 ? "" : "s"} found in the token.`,
       note: "The FPT-CA Signing Agent must be running on this machine at localhost:14211. The browser calls it directly — nothing about the token passes through the signing service.",
+      algorithmNote:
+        "This flow offers only the three RSA PKCS#1 v1.5 algorithms. FPT-CA Signing Agent 1.3.1 has no parameter for the signature scheme — /SignHash only takes a digest algorithm — so RSA-PSS or ECDSA would fail at the last step.",
       pinPolicyNote:
         "The PIN is only ever typed into the FPT-CA window. This page never asks for it, never forwards it and never stores it.",
 
@@ -558,6 +616,11 @@ export const en = {
       retry: "Start over",
       jobExpiresIn: (countdown: string) => `The signing job expires in ${countdown}`,
       jobExpired: "The signing job has expired — start over.",
+      jobAlgorithm: (label: string) => `Algorithm for this job: ${label}`,
+      errorSchemeUnsupported: (label: string) =>
+        `The signing service prepared this job for ${label}, but FPT-CA Signing Agent 1.3.1 can only produce RSA PKCS#1 v1.5 signatures. Going ahead would fail at the last step, so it stopped here. Pick an RSA PKCS#1 v1.5 algorithm and sign again.`,
+      errorDigestUnsupported:
+        "The USB Token cannot sign with the selected digest algorithm. Try RSA PKCS#1 v1.5 / SHA-256 — older devices often only do SHA-256.",
       errorUnreachable:
         "Cannot reach the FPT-CA Signing Agent at localhost:14211. Check that it is running, and that the browser is allowed to access the local network.",
       errorAgentToken:
@@ -653,6 +716,8 @@ export const en = {
       formatNotSupported: (source: string) => `${source} cannot sign this file type.`,
       tooLarge: (limit: string) => `The document exceeds the service limit of ${limit}.`,
       algorithmUnsupported: "The selected algorithm is not offered by this source.",
+      algorithmUnsupportedForFormat: (format: string) =>
+        `This source offers the selected algorithm, but ${format} cannot carry it. Pick an RSA PKCS#1 v1.5 algorithm, or sign a PDF/XML file instead.`,
       baselineUnsupported: (level: string) => `Baseline ${level} is not offered by this source.`,
       chooseMode: "Choose a signature type this source supports.",
       targetRequired: "Counter-sign needs the id of a signature already in the document.",

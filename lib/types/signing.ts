@@ -46,16 +46,52 @@ export type BaselineLevel = "B" | "T" | "LT" | "LTA";
 export type SignatureMode = "CO_SIGN" | "COUNTER_SIGN";
 
 /**
- * Danh sách thuật toán client biết đặt nhãn. Kiểu vẫn nhận `string` vì nguồn duy
- * nhất đáng tin là `source.algorithms` — thêm thuật toán ở backend không được
- * làm hỏng màn hình.
+ * Chín thuật toán backend hỗ trợ. Kiểu ở mọi nơi khác vẫn nhận `string`: nguồn
+ * sự thật là `algorithmsByFormat` + `algorithmCatalog` của capability, và thêm
+ * thuật toán ở backend không được làm hỏng màn hình.
+ *
+ * Danh sách này chỉ dùng để SUY nhãn khi backend cũ chưa trả `algorithmCatalog`
+ * — xem `signature-algorithm.ts`.
  */
 export type KnownSignatureAlgorithm =
+  | "RSA_PSS_SHA256"
+  | "RSA_PSS_SHA384"
+  | "RSA_PSS_SHA512"
   | "RSA_PKCS1_SHA256"
   | "RSA_PKCS1_SHA384"
   | "RSA_PKCS1_SHA512"
-  | "RSA_PSS_SHA256"
-  | "ECDSA_SHA256";
+  | "ECDSA_SHA256"
+  | "ECDSA_SHA384"
+  | "ECDSA_SHA512";
+
+/**
+ * Sơ đồ ký (không phải hàm băm). Ba giá trị này là thứ chia nhóm dropdown và là
+ * thứ quyết định chứng thư cần khoá gì: `ECDSA` cần khoá EC, hai cái còn lại cần
+ * khoá RSA.
+ */
+export type SignatureScheme = "RSASSA_PSS" | "RSA_PKCS1_V1_5" | "ECDSA";
+
+export type SignatureKeyAlgorithm = "RSA" | "EC";
+
+/**
+ * Mô tả một thuật toán, do backend trả trong `capabilities.algorithmCatalog`.
+ *
+ * `label` là NHÃN HIỂN THỊ CHÍNH THỨC. Đừng dựng bảng nhãn riêng ở client: bảng
+ * đó lệch pha ngay lần backend thêm thuật toán tiếp theo, và lệch theo kiểu tệ
+ * nhất — người dùng thấy một tên, file ký ra mang một thuật toán khác.
+ */
+export interface AlgorithmDescriptor {
+  /** `RSA_PSS_SHA256` — khớp với phần tử trong `algorithmsByFormat`. */
+  id: string;
+  /** `RSA-PSS/SHA-256`. */
+  label: string;
+  scheme: SignatureScheme;
+  keyAlgorithm: SignatureKeyAlgorithm;
+  /** `P-256` với ECDSA, `null` với RSA. */
+  namedCurve: string | null;
+  /** `SHA-256`. */
+  digestAlgorithm: string;
+}
 
 /**
  * Cách một lệnh ký đi tới trạng thái cuối — trường `interactionModel` của nguồn.
@@ -99,9 +135,29 @@ export interface SignatureSource {
   /** Tên tiếng Việt do backend đặt — hiển thị nguyên văn, không tự dịch lại. */
   label?: string | null;
   documentFormats: DocumentFormat[];
+  /**
+   * HỢP của mọi định dạng — chỉ để hiển thị tổng quan. ĐỪNG dựng dropdown từ
+   * trường này: với PKCS12 nó là cả 9, nhưng chọn `RSA_PSS_SHA256` cho một file
+   * `.docx` thì server trả `422 ALGORITHM_NOT_SUPPORTED`. Dùng
+   * `algorithmsByFormat` — xem `algorithmsFor()` trong `signature-algorithm.ts`.
+   */
   algorithms: string[];
-  /** Gợi ý; vẫn phải nằm trong `algorithms`. */
+  /** Gợi ý khi CHƯA biết định dạng tệp; vẫn phải nằm trong `algorithms`. */
   defaultAlgorithm?: string | null;
+  /**
+   * Danh sách THẬT SỰ dùng được cho từng định dạng, đã sắp theo thứ tự ưu tiên
+   * của backend (PSS → PKCS#1 → ECDSA). Phần tử đầu là mặc định của cặp
+   * (nguồn, định dạng) — ĐỪNG sắp xếp lại.
+   *
+   * OOXML chỉ chở được 3 × PKCS#1: ECMA-376 Part 2 chỉ định nghĩa RSA cho chữ
+   * ký gói, Word/Excel không đọc được PSS hay ECDSA. Đó là giới hạn của định
+   * dạng, không phải việc backend chưa làm.
+   *
+   * Vắng mặt khi gọi backend đời cũ — khi đó rơi về `algorithms`.
+   */
+  algorithmsByFormat?: Record<string, string[]>;
+  /** Giá trị chọn sẵn theo định dạng. Vắng mặt với backend đời cũ. */
+  defaultAlgorithmByFormat?: Record<string, string>;
   baselineLevels: BaselineLevel[];
   signatureModes: SignatureMode[];
   /** Nguồn có dựng được chữ ký hình ảnh không (còn tuỳ định dạng có hỗ trợ). */
@@ -121,6 +177,11 @@ export interface SignatureSource {
 
 export interface SignCapabilities {
   sources: SignatureSource[];
+  /**
+   * Nhãn và thuộc tính của mọi thuật toán backend biết. Vắng mặt với backend
+   * đời cũ — `signature-algorithm.ts` suy nhãn từ id khi đó.
+   */
+  algorithmCatalog?: AlgorithmDescriptor[];
   maxUploadBytes?: number | null;
 }
 
@@ -301,6 +362,11 @@ export interface FptEnrollmentStatusResponse {
  * chứng thư, nên chưa có CN nào để lấy tên.
  */
 export interface UsbTokenJobRequest {
+  /**
+   * BẮT BUỘC gửi tường minh. Bỏ trống giờ ra `RSA_PSS_SHA256`, mà FPT Signing
+   * Agent 1.3.1 chỉ ký PKCS#1 — backend sẽ khai `RSASSA-PSS` trong CMS, agent
+   * ký PKCS#1, và bước complete trả `422 USB_TOKEN_SIGNATURE_INVALID`.
+   */
   algorithm: string;
   baselineLevel: BaselineLevel;
   signatureMode?: SignatureMode;
@@ -315,8 +381,9 @@ export interface UsbTokenJobRequest {
 }
 
 /**
- * `digestBase64` là base64 của ĐÚNG 32 byte SHA-256. Truyền nguyên văn vào
- * trường `data` của `/SignHash` — decode ra hex/text hay hash lại đều hỏng.
+ * `digestBase64` truyền NGUYÊN VĂN vào trường `data` của `/SignHash` — decode ra
+ * hex/text hay hash lại đều hỏng. Độ dài KHÔNG cố định 32 byte nữa: SHA-256 →
+ * 32, SHA-384 → 48, SHA-512 → 64. Đừng cắt chuỗi hay kiểm độ dài theo hằng số.
  *
  * Job sống 15 phút và dùng ĐƯỢC MỘT LẦN: hoàn tất hai lần, hoặc hai tab cùng
  * hoàn tất, thì chỉ request giành được job trước mới chạy.
@@ -324,7 +391,21 @@ export interface UsbTokenJobRequest {
 export interface UsbTokenJob {
   jobId: string;
   digestBase64: string;
-  digestAlgorithm: "SHA256" | string;
+  /** `SHA256` | `SHA384` | `SHA512` — đưa thẳng vào `algDigest` của agent. */
+  digestAlgorithm: string;
+  /**
+   * Id enum của thuật toán backend đã CHỐT cho job này. Dùng để đối chiếu trước
+   * khi đưa digest cho agent: agent 1.3.1 chỉ ký PKCS#1, nên job PSS/ECDSA phải
+   * bị chặn ở đây thay vì hỏng ở bước complete. Vắng mặt với backend đời cũ.
+   */
+  signatureAlgorithm?: string;
+  /**
+   * Tên chuẩn JCA (`SHA256withRSAandMGF1`, `SHA256withRSA`, `SHA256withECDSA`)
+   * — thứ phải đưa cho agent nào có tham số chọn scheme. Agent 1.3.1 KHÔNG có
+   * tham số đó (chỉ `algDigest`); giữ trường này để hiển thị và để sẵn đường
+   * nối khi lên bản agent mới. Vắng mặt với backend đời cũ.
+   */
+  jcaSignatureAlgorithm?: string;
   expiresAt: string;
 }
 

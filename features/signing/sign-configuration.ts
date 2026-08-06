@@ -8,6 +8,7 @@ import type {
   UsbTokenJobRequest,
 } from "@/lib/types/signing";
 import type { EnrollmentImage } from "./enrollment-image";
+import { algorithmsFor, defaultAlgorithmFor } from "./signature-algorithm";
 import { isUsbTokenSource } from "./usb-token-source";
 
 /**
@@ -222,6 +223,12 @@ function firstAllowed<T>(preferred: T | null | undefined, allowed: readonly T[])
  * dùng đang dùng dở: giữ lại lựa chọn còn hợp lệ khi đổi nguồn, bỏ những lựa
  * chọn nguồn mới không hỗ trợ.
  *
+ * `format` là định dạng của tệp ĐANG chọn. Nó quyết định cả danh sách thuật toán
+ * hợp lệ lẫn giá trị mặc định: cùng một nguồn PKCS12 cho PDF là 9 lựa chọn với
+ * mặc định PSS/SHA-256, nhưng cho DOCX chỉ còn 3 × PKCS#1 với mặc định
+ * PKCS#1/SHA-256. Chưa chọn tệp thì bỏ trống — khi đó `defaultAlgorithm` chung
+ * của nguồn là thứ đúng nhất còn biết được.
+ *
  * Thông tin định danh (username, agreementUuid, hồ sơ đăng ký) LUÔN được giữ:
  * chúng thuộc về người ký chứ không thuộc về nguồn, và gõ lại chúng là phần tốn
  * thời gian nhất của bàn thử này.
@@ -229,10 +236,13 @@ function firstAllowed<T>(preferred: T | null | undefined, allowed: readonly T[])
 export function resolveFormState(
   source: SignatureSource,
   previous?: SignFormState,
+  format?: DocumentFormat,
 ): SignFormState {
   const signatureMode = source.signatureModes.length
     ? firstAllowed(previous?.signatureMode ?? "CO_SIGN", source.signatureModes)
     : undefined;
+
+  const algorithms = algorithmsFor(source, format);
 
   return {
     sourceId: source.id,
@@ -240,9 +250,13 @@ export function resolveFormState(
       firstAllowed(previous?.baselineLevel, source.baselineLevels) ??
       source.baselineLevels[0] ??
       "T",
+    // Giữ lựa chọn cũ khi nó còn dùng được với (nguồn, định dạng) hiện tại; nếu
+    // không thì lấy mặc định của chính cặp đó, KHÔNG phải phần tử đầu của
+    // `source.algorithms` — danh sách hợp đó có thể chứa thuật toán định dạng
+    // này không chở được.
     algorithm:
-      firstAllowed(previous?.algorithm ?? source.defaultAlgorithm, source.algorithms) ??
-      source.algorithms[0] ??
+      firstAllowed(previous?.algorithm, algorithms) ??
+      defaultAlgorithmFor(source, format) ??
       "",
     signatureMode,
     // Chữ ký đích thuộc về đúng một file và đổi sau mỗi lần ký — luôn chọn lại.
@@ -289,6 +303,8 @@ export function buildStartRequest(input: {
     baselineLevel: form.baselineLevel,
   };
 
+  // LUÔN gửi tường minh. Bỏ trống `algorithm` giờ ra RSA-PSS/SHA-256, không còn
+  // là PKCS#1/SHA-256 như trước — im lặng đổi thuật toán dưới chân người dùng.
   if (form.algorithm) payload.algorithm = form.algorithm;
   if (form.signatureMode) payload.signatureMode = form.signatureMode;
   if (form.signatureMode === "COUNTER_SIGN" && form.targetSignatureId.trim()) {
@@ -403,12 +419,50 @@ export function buildContinueRequest(
 }
 
 /* ------------------------------------------------------------------ *
+ * Trình tự cấu hình
+ * ------------------------------------------------------------------ */
+
+/**
+ * Năm bước của màn ký, theo đúng thứ tự phụ thuộc: định dạng tài liệu quyết định
+ * nguồn nào dùng được, nguồn quyết định phần khai riêng và danh sách thuật toán.
+ *
+ * Đây cũng là nhãn dán trên từng lỗi của `validateSignForm` — thanh tiến trình
+ * không tự đoán bước nào chưa xong, nó đọc lại đúng kết quả kiểm tra đang chặn
+ * nút ký.
+ */
+export const SIGN_STEP_ORDER = [
+  "document",
+  "source",
+  "credential",
+  "signature",
+  "review",
+] as const;
+
+export type SignStepId = (typeof SIGN_STEP_ORDER)[number];
+
+/**
+ * Nguồn có phần khai riêng hay không. Nguồn lạ (backend thêm mới, client chưa có
+ * khối nào cho nó) thì bỏ hẳn bước này thay vì hiện một thẻ rỗng.
+ */
+export function hasCredentialStep(source?: SignatureSource): boolean {
+  if (!source) return false;
+  return isPkcs12(source) || isMpki(source) || isSignCloud(source) || isUsbToken(source);
+}
+
+/** Danh sách bước THỰC SỰ hiện ra với nguồn đang chọn. */
+export function buildSignSteps(source?: SignatureSource): SignStepId[] {
+  return SIGN_STEP_ORDER.filter((step) => step !== "credential" || hasCredentialStep(source));
+}
+
+/* ------------------------------------------------------------------ *
  * Kiểm tra trước khi bật nút ký
  * ------------------------------------------------------------------ */
 
 export interface SignFormValidation {
   valid: boolean;
   messages: string[];
+  /** Cùng các thông báo trên, tách theo bước đang chặn — dùng cho thanh tiến trình. */
+  byStep: Record<SignStepId, string[]>;
 }
 
 export interface SignFormValidationMessages {
@@ -418,6 +472,8 @@ export interface SignFormValidationMessages {
   formatNotSupported: (source: string) => string;
   tooLarge: (limit: string) => string;
   algorithmUnsupported: string;
+  /** Thuật toán có trong nguồn nhưng định dạng này không chở được (OOXML). */
+  algorithmUnsupportedForFormat: (format: string) => string;
   baselineUnsupported: (level: string) => string;
   chooseMode: string;
   targetRequired: string;
@@ -451,46 +507,58 @@ export function validateSignForm(input: {
   messages: SignFormValidationMessages;
 }): SignFormValidation {
   const { source, form, file, format, messages } = input;
-  const problems: string[] = [];
+  const problems: StepProblem[] = [];
+  const add = (step: SignStepId, message: string) => problems.push({ step, message });
 
-  if (!file) problems.push(messages.chooseDocument);
-  else if (!format) problems.push(messages.unsupportedFormat);
+  if (!file) add("document", messages.chooseDocument);
+  else if (!format) add("document", messages.unsupportedFormat);
 
   if (!source || !form) {
-    problems.push(messages.chooseSource);
-    return { valid: false, messages: problems };
+    add("source", messages.chooseSource);
+    return collectProblems(problems);
   }
 
   if (format && !supportsFormat(source, format)) {
-    problems.push(messages.formatNotSupported(sourceLabel(source)));
+    add("source", messages.formatNotSupported(sourceLabel(source)));
   }
   if (file && input.maxUploadBytes && file.size > input.maxUploadBytes) {
-    problems.push(messages.tooLarge(input.formatBytes(input.maxUploadBytes)));
+    add("document", messages.tooLarge(input.formatBytes(input.maxUploadBytes)));
   }
 
-  if (!source.algorithms.includes(form.algorithm)) problems.push(messages.algorithmUnsupported);
+  // Đối chiếu với danh sách CỦA ĐỊNH DẠNG, không với hợp `source.algorithms`.
+  // Phân biệt hai ca vì cách sửa khác nhau: thuật toán không thuộc nguồn thì
+  // chọn lại; thuộc nguồn nhưng không hợp định dạng thì đổi tệp cũng là một
+  // đường ra, và câu chữ phải nói được điều đó.
+  if (!algorithmsFor(source, format).includes(form.algorithm)) {
+    add(
+      "signature",
+      format && source.algorithms.includes(form.algorithm)
+        ? messages.algorithmUnsupportedForFormat(format)
+        : messages.algorithmUnsupported,
+    );
+  }
   if (!source.baselineLevels.includes(form.baselineLevel)) {
-    problems.push(messages.baselineUnsupported(form.baselineLevel));
+    add("signature", messages.baselineUnsupported(form.baselineLevel));
   }
 
   if (source.signatureModes.length > 0) {
     if (!form.signatureMode || !source.signatureModes.includes(form.signatureMode)) {
-      problems.push(messages.chooseMode);
+      add("signature", messages.chooseMode);
     } else if (form.signatureMode === "COUNTER_SIGN" && !form.targetSignatureId.trim()) {
-      problems.push(messages.targetRequired);
+      add("signature", messages.targetRequired);
     }
   }
 
   if (source.materialMode === "PKCS12") {
     if (source.requiresUploadedKeyFile !== false && !input.p12File) {
-      problems.push(messages.p12FileRequired);
+      add("credential", messages.p12FileRequired);
     }
     // Mật khẩu là bắt buộc tuyệt đối; thiếu là 400 PKCS12_MATERIAL_REQUIRED.
-    if (!form.p12Password) problems.push(messages.p12PasswordRequired);
+    if (!form.p12Password) add("credential", messages.p12PasswordRequired);
   }
 
   if (isMpki(source)) {
-    if (!form.mpkiUsername.trim()) problems.push(messages.mpkiUsernameRequired);
+    if (!form.mpkiUsername.trim()) add("credential", messages.mpkiUsernameRequired);
     // Bỏ trống credentialId CHỈ hợp lệ khi người ký có đúng một credential —
     // mà điều đó chỉ biết được sau khi đã tải danh sách.
     else if (
@@ -498,7 +566,7 @@ export function validateSignForm(input: {
       !form.mpkiCredentialId.trim() &&
       (input.credentialCount ?? 0) !== 1
     ) {
-      problems.push(messages.mpkiCredentialRequired);
+      add("credential", messages.mpkiCredentialRequired);
     }
   }
 
@@ -507,25 +575,26 @@ export function validateSignForm(input: {
   // chưa, có chứng thư nào không) chỉ biết được lúc bấm ký — hộp thoại ký lo.
   if (isUsbToken(source)) {
     if (source.requiresSignerDisplayName !== false && !form.signerDisplayName.trim()) {
-      problems.push(messages.signerDisplayNameRequired);
+      add("credential", messages.signerDisplayNameRequired);
     }
   }
 
   if (isSignCloud(source)) {
     if (source.requiresSignerDisplayName !== false && !form.signerDisplayName.trim()) {
-      problems.push(messages.signerDisplayNameRequired);
+      add("credential", messages.signerDisplayNameRequired);
     }
     if (form.agreementUuid.trim()) {
       // Đăng ký vừa tạo ở phiên này mà chưa xác nhận danh tính xong: chứng thư
       // chưa tồn tại, ký bây giờ là ném đi một lượt START đã bị tính phí.
       if (input.agreementStage === "AWAITING_CONFIRMATION") {
-        problems.push(messages.agreementNotReady);
+        add("credential", messages.agreementNotReady);
       }
     } else if (source.requiresEnrollment !== false) {
       // Hồ sơ điền xong KHÔNG phải là ký được. Đường duy nhất tới chứng thư là
       // bấm đăng ký rồi xác nhận danh tính; ký thẳng lúc này để service tự đăng
       // ký thì uuid không bao giờ về tới đây và lần sau lại đăng ký lại.
-      problems.push(
+      add(
+        "credential",
         enrollmentComplete(form.enrollment)
           ? messages.agreementRequired
           : messages.enrollmentRequired,
@@ -533,5 +602,28 @@ export function validateSignForm(input: {
     }
   }
 
-  return { valid: problems.length === 0, messages: problems };
+  return collectProblems(problems);
+}
+
+interface StepProblem {
+  step: SignStepId;
+  message: string;
+}
+
+/**
+ * Giữ NGUYÊN thứ tự đã đẩy vào cho `messages` — danh sách phẳng vẫn là thứ hiện
+ * dưới nút ký, và đọc nó theo thứ tự phát hiện dễ hiểu hơn là theo thứ tự bước.
+ */
+function collectProblems(problems: StepProblem[]): SignFormValidation {
+  const byStep = Object.fromEntries(
+    SIGN_STEP_ORDER.map((step) => [step, [] as string[]]),
+  ) as Record<SignStepId, string[]>;
+
+  for (const problem of problems) byStep[problem.step].push(problem.message);
+
+  return {
+    valid: problems.length === 0,
+    messages: problems.map((problem) => problem.message),
+    byStep,
+  };
 }

@@ -159,7 +159,16 @@ export async function listAgentCertificates(
  * PIN, nên lời gọi này treo cho tới khi người ký xong việc ở cửa sổ đó.
  *
  * `data` phải là ĐÚNG chuỗi `digestBase64` backend trả về: agent không hash lại,
- * nó ký thẳng khối byte này.
+ * nó ký thẳng khối byte này. Độ dài KHÔNG còn cố định — `algDigest` quyết định
+ * (SHA256 → 32 byte, SHA384 → 48, SHA512 → 64) — nên đừng kiểm hay cắt theo
+ * hằng số nào.
+ *
+ * `jcaSignatureAlgorithm` (`SHA256withRSA`, `SHA256withRSAandMGF1`,
+ * `SHA256withECDSA`) CỐ Ý không được gửi đi: bản 1.3.1 của agent không có tham
+ * số nào khai scheme ký — `/SignHash` chỉ nhận `algDigest`, và scheme luôn là
+ * PKCS#1 v1.5. Nhận nó ở đây để chỗ gọi khỏi phải biết điều đó, và để chỉ đúng
+ * MỘT chỗ phải sửa khi lên bản agent có tham số ấy: thêm nó vào body ngay dưới
+ * `algDigest`, rồi nới `USB_TOKEN_AGENT_SCHEMES` trong `usb-token-source.ts`.
  */
 export async function signHash(
   input: {
@@ -167,6 +176,8 @@ export async function signHash(
     digestBase64: string;
     digestAlgorithm: string;
     serialNumber: string;
+    /** Xem ghi chú ở trên — hiện chưa có đường gửi xuống agent 1.3.1. */
+    jcaSignatureAlgorithm?: string;
   },
   signal?: AbortSignal,
 ): Promise<string> {

@@ -1,21 +1,14 @@
 import type { ContentType } from "@/lib/types/domain";
-import type { DocumentFormat, KnownSignatureAlgorithm } from "@/lib/types/signing";
+import type { DocumentFormat } from "@/lib/types/signing";
 
-/** Helper về tệp và định dạng, dùng chung giữa panel tài liệu và form cấu hình ký. */
+/**
+ * Helper về tệp và định dạng, dùng chung giữa panel tài liệu và form cấu hình ký.
+ *
+ * Nhãn thuật toán CỐ Ý không nằm ở đây nữa: nó đến từ
+ * `capabilities.algorithmCatalog[].label` — xem `signature-algorithm.ts`.
+ */
 
 export const ACCEPTED_EXTENSIONS = [".pdf", ".xml", ".docx", ".xlsx", ".pptx"];
-
-export const SIGNATURE_ALGORITHM_LABELS: Record<KnownSignatureAlgorithm, string> = {
-  RSA_PKCS1_SHA256: "RSA PKCS#1 / SHA-256",
-  RSA_PKCS1_SHA384: "RSA PKCS#1 / SHA-384",
-  RSA_PKCS1_SHA512: "RSA PKCS#1 / SHA-512",
-  RSA_PSS_SHA256: "RSA-PSS / SHA-256",
-  ECDSA_SHA256: "ECDSA / SHA-256",
-};
-
-export function algorithmLabel(algorithm: string): string {
-  return SIGNATURE_ALGORITHM_LABELS[algorithm as KnownSignatureAlgorithm] ?? algorithm;
-}
 
 export function fileExtension(fileName: string): string {
   return fileName.includes(".") ? (fileName.split(".").pop() ?? "") : "";

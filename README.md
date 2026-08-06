@@ -1,7 +1,8 @@
 # sign-test
 
-Bàn thử chức năng ký — **một màn duy nhất**, chạy trên contract của collection
-*"Signing Service — Toàn bộ luồng ký (p12 / MPKI App / eSign Cloud OTP)"*.
+Bàn thử chức năng ký và thẩm định chữ ký — **hai màn**, không có login. Luồng ký
+chạy trên contract của collection *"Signing Service — Toàn bộ luồng ký (p12 /
+MPKI App / eSign Cloud OTP)"*.
 
 ## Chạy
 
@@ -10,7 +11,14 @@ npm install
 npm run dev
 ```
 
-Mở http://localhost:3000 — đó là màn ký, không có login, không có điều hướng.
+| Đường dẫn | Màn |
+|---|---|
+| http://localhost:3000/ | Ký tài liệu |
+| http://localhost:3000/verify | Thẩm định tệp đã ký |
+
+Hai màn dùng chung địa chỉ API và chuyển qua lại bằng thanh điều hướng ở trên
+cùng. Mỗi màn là một URL riêng nên mở song song hai tab được — ký ở tab này rồi
+verify kết quả ở tab kia.
 
 ### Chọn môi trường dịch vụ ký
 
@@ -78,11 +86,40 @@ baselineLevel, không đọc `signing.tsa.enabled`. Cấu hình TSA sai chỉ l�
 ký đầu tiên dưới dạng `422 SIGNING_FAILED`. Ký thử với baseline **B** để tách
 bạch lỗi TSA khỏi lỗi luồng ký.
 
+## Màn verify
+
+Thả một tệp đã ký vào, nhận báo cáo thẩm định: kết luận từng chữ ký, cây kiểm
+tra, chuỗi chứng thư, dấu thời gian, manifest và danh sách issue.
+
+Ba điều dễ đọc sai kết quả:
+
+1. **HTTP 200 không có nghĩa chữ ký hợp lệ.** 200 chỉ nghĩa là verify chạy xong;
+   kết luận nằm ở `data.status`. Chữ ký hỏng vẫn trả 200.
+2. **`INDETERMINATE` không phải lỗi.** Chữ ký đúng về mật mã nhưng thiếu dữ liệu
+   để kết luận — hay gặp nhất là backend chưa cấu hình trust anchor. Màn hình
+   hiển thị vàng, không phải đỏ.
+3. **`matched: null` khác `matched: false`.** `null` = không đối chiếu được;
+   `false` = digest sai.
+
+### Service ký hiện tại chưa có verify
+
+Màn verify gọi `POST /api/v2/signatures/validate`. Signing Service ở
+`localhost:8080` **không có** endpoint này — nó chỉ ký. Khi đó màn hình báo
+`VERIFY_NOT_SUPPORTED` kèm hướng dẫn, không phải lỗi tệp. Trỏ địa chỉ API sang
+service có verify (Sigil API) để dùng màn này.
+
+Nút *Thêm vào allowlist và verify lại* (hiện khi issue là `OCSP_URL_NOT_ALLOWED`
+/ `CRL_URL_NOT_ALLOWED`) gọi `POST /api/v1/revocation-allowlist` và cũng phụ
+thuộc service đó. Bên signing-tool nút này ẩn/hiện theo quyền `trust:admin`;
+ở đây không có xác thực nên luôn hiện.
+
 ## Cấu trúc
 
 ```
 app/page.tsx                       màn ký (Server Component)
-app/api/signing/**                 proxy sang dịch vụ ký, không gắn token
+app/verify/page.tsx                màn verify
+app/api/signing/**                 proxy sang backend, không gắn token
+components/shell/page-chrome.tsx   khung chung: điều hướng + địa chỉ API + ngôn ngữ + theme
 features/signing/
   api-base-url.ts                  base URL cấu hình trên giao diện (localStorage)
   sign-api.ts                      client của Signing Service
@@ -90,10 +127,18 @@ features/signing/
   sign-record-store.ts             giữ phiên eSign Cloud + agreementUuid
   document-format.ts               nhận diện định dạng, quét chữ ký đích
   components/                      workspace, preview, hộp thoại phiên ký
+features/verification/
+  api.ts                           client verify + bảng dịch mã lỗi
+  components/                      workspace verify (báo cáo, cây kiểm tra, chuỗi CA)
 lib/server/sign-proxy.ts           chỗ DUY NHẤT chạm tới địa chỉ backend
-lib/types/signing.ts               contract với backend
+lib/types/signing.ts               contract luồng ký
+lib/types/verification.ts          contract luồng verify + adapter schema v2 → v1
 lib/i18n/                          từ điển EN/VI
 ```
+
+Hai contract **không** dùng chung enum định dạng: bên ký nói định dạng tài liệu
+(`PDF/XML/WORD/EXCEL/POWERPOINT`), bên verify nói chuẩn chữ ký (`PADES/XADES/
+OOXML`) và loại tệp theo đuôi (`DOCX/XLSX/PPTX`).
 
 ### Nếu dịch vụ thật bật xác thực trở lại
 
@@ -110,3 +155,7 @@ Chỉ cần sửa `signApiFetch` trong `lib/server/sign-proxy.ts` để gắn he
 | `GET /api/signing/remote-ca/mpki/credentials/{id}` | `GET /api/v1/remote-ca/mpki/credentials/{id}` |
 | `POST /api/signing/remote-ca/fpt/enrollments` | `POST /api/v1/remote-ca/fpt/enrollments` |
 | `POST /api/signing/remote-ca/fpt/enrollments/{uuid}/status` | tương ứng dưới `/api/v1` |
+| `POST /api/signing/signatures/validate` | `POST /api/v2/signatures/validate` (multipart: `file`) |
+| `POST /api/signing/revocation-allowlist` | `POST /api/v1/revocation-allowlist` |
+
+Hai đường cuối thuộc màn verify và cần service có verify — xem mục *Màn verify*.

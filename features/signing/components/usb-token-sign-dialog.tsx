@@ -26,6 +26,8 @@ import {
   WarningBlock,
   type SignFlowError,
 } from "./sign-dialog-parts";
+import { algorithmLabel, type AlgorithmCatalog } from "../signature-algorithm";
+import { agentCanSign } from "../usb-token-source";
 
 /**
  * Luồng ký bằng FPT USB Token, chạy trọn trong hộp thoại này.
@@ -58,6 +60,8 @@ interface UsbTokenSignDialogProps {
   sourceName: string;
   file: File;
   request: UsbTokenJobRequest;
+  /** Nhãn thuật toán của backend — xem `signature-algorithm.ts`. */
+  catalog?: AlgorithmCatalog;
   onCompleted: (response: SignResponse) => void;
   onClose: () => void;
 }
@@ -68,6 +72,7 @@ export function UsbTokenSignDialog({
   sourceName,
   file,
   request,
+  catalog,
   onCompleted,
   onClose,
 }: UsbTokenSignDialogProps) {
@@ -101,7 +106,11 @@ export function UsbTokenSignDialog({
             : cause.code === FPT_AGENT_CODE.tokenInvalid ||
                 cause.code === FPT_AGENT_CODE.tokenNotInitialized
               ? u.errorAgentToken
-              : undefined;
+              : // Agent từ chối chính `algDigest` vừa gửi — token hoặc driver
+                // không làm được SHA-384/SHA-512. Chọn lại SHA-256 là xong.
+                cause.code === FPT_AGENT_CODE.algorithmNotSupported
+                ? u.errorDigestUnsupported
+                : undefined;
         return {
           message: known ?? cause.message,
           code: `FPT_AGENT_${cause.code}`,
@@ -130,6 +139,25 @@ export function UsbTokenSignDialog({
         if (cancelled) return;
         setJob(prepared);
 
+        /*
+          Backend đã CHỐT thuật toán cho job này. Nếu nó không phải PKCS#1 thì
+          agent 1.3.1 ký ra một chữ ký khác scheme với cái backend khai trong
+          CMS, và bước complete sẽ trả `422 USB_TOKEN_SIGNATURE_INVALID` — sau
+          khi đã bắt người ký nhập PIN. Dừng ngay ở đây: rẻ hơn một lần nhập PIN
+          và nói được đúng nguyên nhân.
+
+          `signatureAlgorithm` vắng mặt nghĩa là backend đời cũ, khi đó nó chỉ
+          ký PKCS#1/SHA-256 — không có gì để chặn.
+        */
+        const chosen = prepared.signatureAlgorithm;
+        if (chosen && !agentCanSign(chosen, catalog)) {
+          setError({
+            message: u.errorSchemeUnsupported(algorithmLabel(chosen, catalog)),
+            code: "USB_TOKEN_AGENT_SCHEME_UNSUPPORTED",
+          });
+          return;
+        }
+
         setPhase("CONNECTING_AGENT");
         const agentToken = await getAgentToken(controller.signal);
         if (cancelled) return;
@@ -154,8 +182,9 @@ export function UsbTokenSignDialog({
       cancelled = true;
       controller.abort();
     };
-    // `request` được dựng lại mỗi lần render của cha nên KHÔNG đưa vào deps —
-    // nó sẽ tạo job mới vô hạn. Cha chốt payload lúc mở hộp thoại.
+    // `request` và `catalog` được dựng lại mỗi lần render của cha nên KHÔNG đưa
+    // vào deps — chúng sẽ tạo job mới vô hạn. Cha chốt payload lúc mở hộp thoại,
+    // và catalog chỉ đọc nhãn nên đọc bản cũ cũng không sai.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [attempt, file, describe]);
 
@@ -171,9 +200,13 @@ export function UsbTokenSignDialog({
       const signature = await signHash({
         token: agentToken,
         digestBase64: job.digestBase64,
+        // Đúng chuỗi backend trả về (SHA256 / SHA384 / SHA512) — không còn giả
+        // định SHA-256, và không suy lại từ độ dài digest.
         digestAlgorithm: job.digestAlgorithm,
         // Nguyên văn serial agent trả về — chuẩn hoá là agent không tìm ra khoá.
         serialNumber: certificate.serialNumber,
+        // Agent 1.3.1 chưa có chỗ nhận — xem `signHash()`.
+        jcaSignatureAlgorithm: job.jcaSignatureAlgorithm,
       });
 
       setPhase("COMPLETING");
@@ -249,6 +282,17 @@ export function UsbTokenSignDialog({
               <p className="text-[10.5px] leading-relaxed text-fg-muted">{u.certificateNote}</p>
             </div>
           )
+        ) : null}
+
+        {/*
+          Thuật toán backend đã chốt cho job. Hiện ra vì nó KHÔNG nhất thiết
+          bằng cái người dùng chọn ở form: bỏ trống `algorithm` là backend tự
+          lấy mặc định của nó, và mặc định đó nay là PSS chứ không phải PKCS#1.
+        */}
+        {job?.signatureAlgorithm ? (
+          <p className="text-center text-[10.5px] text-fg-muted">
+            {u.jobAlgorithm(algorithmLabel(job.signatureAlgorithm, catalog))}
+          </p>
         ) : null}
 
         {remaining !== undefined && !error ? (
