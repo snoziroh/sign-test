@@ -6,7 +6,7 @@ import { getDictionary } from "@/lib/i18n";
 
 export async function generateMetadata(): Promise<Metadata> {
   const meta = getDictionary(await getLocale()).routes.signRequest;
-  return { title: meta.title, description: meta.description };
+  return { title: "Signing Request Mockup", description: meta.description };
 }
 
 /**

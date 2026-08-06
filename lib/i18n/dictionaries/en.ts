@@ -39,7 +39,7 @@ export const en = {
     },
     signRequest: {
       label: "Sign request",
-      title: "New signing request",
+      title: "Signing Request",
       description:
         "Attach a document, lay out who signs in which order, then send the request out",
     },
