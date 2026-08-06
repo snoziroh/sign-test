@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Dialog } from "@/components/ui/dialog";
-import { CheckIcon } from "@/components/ui/icons";
+import { CheckIcon, ChevronLeftIcon, ChevronRightIcon } from "@/components/ui/icons";
 import type { Dictionary } from "@/lib/i18n";
 import type { SignResponse, UsbTokenJob, UsbTokenJobRequest } from "@/lib/types/signing";
 import { completeUsbTokenJob, createUsbTokenJob } from "../sign-api";
@@ -82,7 +82,14 @@ export function UsbTokenSignDialog({
   const [phase, setPhase] = useState<UsbTokenPhase>("PREPARING");
   const [job, setJob] = useState<UsbTokenJob>();
   const [certificates, setCertificates] = useState<FptCertificate[]>([]);
-  const [selected, setSelected] = useState<string>();
+  /**
+   * Chứng thư ĐANG HIỆN trong băng chuyền — và cũng chính là chứng thư sẽ được
+   * ký. Trước đây danh sách bày hết ra cùng lúc, nên lựa chọn phải giữ riêng
+   * bằng thumbprint; giờ mỗi lần chỉ nhìn thấy một, nên tách hai thứ đó ra chỉ
+   * mở đường cho một ca hỏng: cuộn tới chứng thư khác rồi bấm ký, và ký nhầm
+   * cái đang không nằm trên màn hình.
+   */
+  const [certificateIndex, setCertificateIndex] = useState(0);
   const [error, setError] = useState<SignFlowError>();
   /** Tăng lên mỗi lần bấm "thử lại" — khoá chạy lại toàn bộ luồng. */
   const [attempt, setAttempt] = useState(0);
@@ -129,7 +136,7 @@ export function UsbTokenSignDialog({
     async function prepare() {
       setError(undefined);
       setCertificates([]);
-      setSelected(undefined);
+      setCertificateIndex(0);
       setJob(undefined);
       agentTokenRef.current = undefined;
       setPhase("PREPARING");
@@ -167,9 +174,7 @@ export function UsbTokenSignDialog({
         if (cancelled) return;
 
         setCertificates(list);
-        // Có đúng một chứng thư thì chọn sẵn cho đỡ một cú click — nhưng vẫn
-        // phải bấm nút ký, vì đó là lúc người ký xác nhận danh tính.
-        setSelected(list.length === 1 ? list[0].thumbprint : undefined);
+        setCertificateIndex(0);
         setPhase("SELECTING_CERTIFICATE");
       } catch (cause) {
         if (cancelled || (cause instanceof DOMException && cause.name === "AbortError")) return;
@@ -191,7 +196,7 @@ export function UsbTokenSignDialog({
   /* Chặng 3 → 5: chỉ chạy khi người ký bấm. */
   async function signWithCertificate() {
     const agentToken = agentTokenRef.current;
-    const certificate = certificates.find((item) => item.thumbprint === selected);
+    const certificate = certificates[certificateIndex];
     if (!job || !agentToken || !certificate) return;
 
     setError(undefined);
@@ -254,33 +259,12 @@ export function UsbTokenSignDialog({
               <p className="text-[11.5px] leading-relaxed text-warning">{u.noCertificates}</p>
             </div>
           ) : (
-            <div className="space-y-1.5">
-              <p className="text-[11px] font-semibold text-fg-muted">{u.chooseCertificate}</p>
-              {certificates.map((certificate) => (
-                <button
-                  key={certificate.thumbprint}
-                  type="button"
-                  aria-pressed={selected === certificate.thumbprint}
-                  onClick={() => setSelected(certificate.thumbprint)}
-                  className={`w-full rounded-md border p-2.5 text-left ${
-                    selected === certificate.thumbprint
-                      ? "border-accent bg-accent-subtle"
-                      : "border-border bg-surface"
-                  }`}
-                >
-                  <p className="text-[12.5px] font-semibold text-fg">
-                    {certificateLabel(certificate)}
-                  </p>
-                  <p className="mt-0.5 truncate text-[10.5px] text-fg-muted">
-                    {u.certificateIssuer(certificate.issuer)}
-                  </p>
-                  <p className="mt-0.5 font-mono text-[10.5px] text-fg-muted">
-                    {u.certificateValidity(certificate.notBefore, certificate.notAfter)}
-                  </p>
-                </button>
-              ))}
-              <p className="text-[10.5px] leading-relaxed text-fg-muted">{u.certificateNote}</p>
-            </div>
+            <CertificateCarousel
+              t={t}
+              certificates={certificates}
+              index={certificateIndex}
+              onIndexChange={setCertificateIndex}
+            />
           )
         ) : null}
 
@@ -307,6 +291,7 @@ export function UsbTokenSignDialog({
           {s.close}
         </button>
 
+
         {!busy && (error || certificates.length === 0) ? (
           <button
             type="button"
@@ -320,7 +305,7 @@ export function UsbTokenSignDialog({
         {phase === "SELECTING_CERTIFICATE" && certificates.length > 0 ? (
           <button
             type="button"
-            disabled={!selected}
+            disabled={!certificates[certificateIndex]}
             onClick={signWithCertificate}
             className={dialogButtonClass(true)}
           >
@@ -330,5 +315,132 @@ export function UsbTokenSignDialog({
         ) : null}
       </div>
     </Dialog>
+  );
+}
+
+/**
+ * Băng chuyền chứng thư: mỗi lần một cái.
+ *
+ * Trước đây danh sách đổ thẳng ra hộp thoại, mà `Dialog` bị chặn ở `max-h-[80vh]`
+ * và `overflow-hidden` — token có bốn, năm chứng thư là hai nút "Đóng" / "Ký với
+ * chứng thư này" ở chân hộp thoại bị CẮT MẤT, không cuộn tới được. Băng chuyền
+ * làm khối này cao cố định, nên số chứng thư trong token không còn ảnh hưởng gì
+ * tới chiều cao hộp thoại nữa.
+ *
+ * Thẻ có chiều cao CỐ ĐỊNH — không phải `min-h` — để trượt qua lại không giật:
+ * tên chủ thể của chứng thư doanh nghiệp dài gấp ba tên người, và nó bị kẹp hai
+ * dòng thay vì đẩy thẻ (và cả hộp thoại) cao lên.
+ */
+function CertificateCarousel({
+  t,
+  certificates,
+  index,
+  onIndexChange,
+}: {
+  t: Dictionary;
+  certificates: FptCertificate[];
+  index: number;
+  onIndexChange: (index: number) => void;
+}) {
+  const u = t.sign.usbToken;
+  const total = certificates.length;
+  const certificate = certificates[index];
+  if (!certificate) return null;
+
+  // Chạy vòng: ở cái cuối bấm tiếp là quay về cái đầu. Với ba, bốn phần tử thì
+  // đó là thứ đỡ bực nhất — không có nút nào chết cứng ở hai đầu.
+  const step = (delta: number) => onIndexChange((index + delta + total) % total);
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-baseline justify-between gap-3">
+        <p className="text-[11px] font-semibold text-fg-muted">{u.chooseCertificate}</p>
+        <p
+          aria-live="polite"
+          className="shrink-0 font-mono text-[10.5px] tracking-[0.04em] text-fg-subtle"
+        >
+          {u.certificateCounter(index + 1, total)}
+        </p>
+      </div>
+
+      <div className="flex items-stretch gap-2">
+        {total > 1 ? (
+          <CarouselArrow label={u.previousCertificate} onClick={() => step(-1)}>
+            <ChevronLeftIcon size={16} />
+          </CarouselArrow>
+        ) : null}
+
+        {/*
+          `key` là thumbprint chứ không phải chỉ số: đổi phần tử thì React dựng
+          lại thẻ, và hiệu ứng hiện dần chạy lại — nếu không thì trượt qua lại
+          chỉ thấy chữ đổi tại chỗ, không thấy là mình vừa đi sang cái khác.
+        */}
+        <div
+          key={certificate.thumbprint}
+          className="flex h-31 min-w-0 flex-1 animate-[toast-in_.18s_ease-out] flex-col justify-center overflow-hidden rounded-md border border-accent bg-accent-subtle p-3"
+        >
+          <p className="line-clamp-2 text-[12.5px] font-semibold text-fg">
+            {certificateLabel(certificate)}
+          </p>
+          <p className="mt-1 truncate text-[10.5px] text-fg-muted">
+            {u.certificateIssuer(certificate.issuer)}
+          </p>
+          <p className="mt-0.5 truncate font-mono text-[10.5px] text-fg-muted">
+            {u.certificateSerial(certificate.serialNumber)}
+          </p>
+          <p className="mt-0.5 font-mono text-[10.5px] text-fg-muted">
+            {u.certificateValidity(certificate.notBefore, certificate.notAfter)}
+          </p>
+        </div>
+
+        {total > 1 ? (
+          <CarouselArrow label={u.nextCertificate} onClick={() => step(1)}>
+            <ChevronRightIcon size={16} />
+          </CarouselArrow>
+        ) : null}
+      </div>
+
+      {/* `flex-wrap`: token nhiều chứng thư thì hàng chấm xuống dòng, không đẩy ngang hộp thoại. */}
+      {total > 1 ? (
+        <div className="flex flex-wrap justify-center gap-1.5 pt-0.5">
+          {certificates.map((item, position) => (
+            <button
+              key={item.thumbprint}
+              type="button"
+              aria-label={u.goToCertificate(position + 1)}
+              aria-current={position === index ? "true" : undefined}
+              onClick={() => onIndexChange(position)}
+              className={`h-1.5 rounded-full transition-all ${
+                position === index ? "w-5 bg-accent" : "w-1.5 bg-border hover:bg-fg-subtle"
+              }`}
+            />
+          ))}
+        </div>
+      ) : null}
+
+      <p className="text-[10.5px] leading-relaxed text-fg-muted">{u.certificateNote}</p>
+    </div>
+  );
+}
+
+function CarouselArrow({
+  label,
+  onClick,
+  children,
+}: {
+  label: string;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      onClick={onClick}
+      className="flex w-8.5 shrink-0 items-center justify-center rounded-md border border-border bg-surface text-fg-muted hover:bg-inset hover:text-fg"
+    >
+      {children}
+    </button>
   );
 }

@@ -610,6 +610,12 @@ export const en = {
       certificateValidity: (from: string, to: string) => `${from} → ${to}`,
       certificateNote:
         "Validity shown as reported by the agent; the service re-reads it from the certificate itself.",
+      /** Carousel controls — one certificate is shown at a time. */
+      certificateCounter: (current: number, total: number) => `${current} / ${total}`,
+      previousCertificate: "Previous certificate",
+      nextCertificate: "Next certificate",
+      goToCertificate: (position: number) => `Show certificate ${position}`,
+      certificateSerial: (serial: string) => `Serial ${serial}`,
       signWithCertificate: "Sign with this certificate",
       noCertificates:
         "No usable certificate found. Check that the USB Token is plugged in and that its driver recognises it.",

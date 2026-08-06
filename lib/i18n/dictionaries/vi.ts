@@ -610,6 +610,11 @@ export const vi: Dictionary = {
       certificateValidity: (from: string, to: string) => `${from} → ${to}`,
       certificateNote:
         "Hiệu lực hiển thị theo đúng chuỗi agent trả về; dịch vụ ký đọc lại hiệu lực thật từ chính chứng thư.",
+      certificateCounter: (current: number, total: number) => `${current} / ${total}`,
+      previousCertificate: "Chứng thư trước",
+      nextCertificate: "Chứng thư sau",
+      goToCertificate: (position: number) => `Xem chứng thư thứ ${position}`,
+      certificateSerial: (serial: string) => `Số sê-ri ${serial}`,
       signWithCertificate: "Ký với chứng thư này",
       noCertificates:
         "Không tìm thấy chứng thư dùng được. Kiểm tra USB Token đã cắm chưa và driver đã nhận thiết bị chưa.",
