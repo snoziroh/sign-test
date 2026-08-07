@@ -107,6 +107,17 @@ export const vi: Dictionary = {
     navigationTitle: "Điều hướng",
     backToHome: "Trang chủ",
     open: "Mở",
+    home:"Trang chủ",
+    openNavigation:"Mở menu điều hướng",
+    openSettings:"Mở cài đặt",
+    mobileNavigationTitle:"Điều hướng",
+    mobileNavigationDescription:"Chuyển giữa các màn hình của ứng dụng.",
+    settingsTitle:"Cài đặt",
+    settingsDescription:"Thiết lập giao diện ứng dụng.",
+    language:"Ngôn ngữ",
+    languageDescription:"Ngôn ngữ hiển thị.",
+    theme:"Giao diện",
+    themeDescription:"Chế độ hiển thị sáng hoặc tối."
   },
 
   shell: {
@@ -1139,7 +1150,11 @@ export const vi: Dictionary = {
       description:
         "Dịch vụ verify đã gộp và xếp sẵn thứ tự — làm lần lượt từ trên xuống.",
       requiresResigning: "Phải ký lại tài liệu",
-      requiresNetwork: "Cần truy cập mạng",
+      networkRequirement: {
+        NOT_REQUIRED: "Không cần truy cập mạng",
+        REQUIRED: "Cần truy cập mạng",
+        CONDITIONAL: "Có thể cần truy cập mạng",
+      },
       stage: {
         VERIFIER_CONFIGURATION: "Cấu hình verifier",
         DOCUMENT_GENERATION: "Sinh tài liệu",
@@ -1274,12 +1289,109 @@ export const vi: Dictionary = {
       rootCauses: "Nguyên nhân gốc",
       consequences: (n: number) => `${n} hệ quả kéo theo`,
       needsResigning: "Cần ký lại tài liệu",
+      byCode: {
+        SIGNER_TRUST_STORE_EMPTY: {
+          title: "Chưa xác minh được nguồn chứng thư của người ký",
+          description:
+            "Chữ ký vẫn có thể đúng về mật mã, nhưng verifier chưa được cấu hình nguồn tin cậy để xác nhận chứng thư của người ký.",
+        },
+        TSA_TRUST_STORE_EMPTY: {
+          title: "Chưa xác minh được nguồn dấu thời gian",
+          description:
+            "Dấu thời gian có thể đúng về mật mã nhưng verifier chưa thể neo chứng thư TSA vào nguồn tin cậy.",
+        },
+        ISSUER_CERTIFICATE_NOT_AVAILABLE: {
+          title: "Thiếu chứng thư trung gian",
+          description: "Hệ thống chưa có đủ certificate cần thiết để xây dựng hoàn chỉnh đường dẫn chứng thư.",
+        },
+        REVOCATION_NOT_EVALUATED: {
+          title: "Chưa kiểm tra được trạng thái thu hồi",
+          description:
+            "Đây là bước chưa được thực hiện do một kiểm tra phụ thuộc phía trước chưa hoàn tất; không có nghĩa chứng thư đã bị thu hồi.",
+        },
+      } as Record<string, { title: string; description: string }>,
     },
     allowlist: {
       action: "Thêm vào allowlist và verify lại",
       adding: "Đang xử lý…",
       genericError: "Đã có lỗi xảy ra. Vui lòng thử lại.",
       reverifyFailed: "Đã thêm vào allowlist nhưng verify lại thất bại.",
+    },
+    summary: {
+      validSummary: (processed: number) => `Đã xử lý ${processed} chữ ký. Các kiểm tra bắt buộc theo policy hiện tại đã đạt.`,
+      invalidSummary:
+        "Phát hiện chữ ký hoặc nội dung không đáp ứng yêu cầu xác thực. Hãy chọn chữ ký có trạng thái lỗi để xem nguyên nhân.",
+      indeterminateSummary: (valid: number, processed: number) =>
+        `${valid}/${processed} chữ ký hợp lệ về mật mã, nhưng hệ thống chưa có đủ điều kiện để kết luận đầy đủ về trust, revocation hoặc thời gian tin cậy.`,
+      cryptoValidCount: (valid: number, processed: number) => `${valid}/${processed} chữ ký hợp lệ về mật mã`,
+      failedCount: (n: number) => `${n} chữ ký không đạt`,
+      indeterminateCount: (n: number) => `${n} chữ ký chưa thể kết luận đầy đủ`,
+      rootIssuesCount: (n: number) => `${n} vấn đề gốc cần rà soát`,
+    },
+    apiErrors: {
+      VERIFY_NOT_SUPPORTED:
+        "Dịch vụ ở địa chỉ này không có endpoint verify (POST /api/v1/verify). Kiểm tra lại địa chỉ dịch vụ verify — dịch vụ ký không thẩm định được.",
+      ALLOWLIST_NOT_SUPPORTED:
+        "Dịch vụ ở địa chỉ này không có endpoint allowlist thu hồi (POST /api/v1/revocation-allowlist).",
+      VERIFY_API_UNREACHABLE: "Không kết nối được tới dịch vụ verify. Kiểm tra lại địa chỉ và xem service đã chạy chưa.",
+      VERIFY_API_NOT_CONFIGURED:
+        "Chưa có địa chỉ dịch vụ verify. Đặt địa chỉ ở nút cấu hình phía trên, hoặc đặt VERIFY_API_URL trong .env.local.",
+      VERIFY_API_BASE_URL_INVALID:
+        "Địa chỉ dịch vụ verify không hợp lệ. Phải là URL http:// hoặc https:// đầy đủ, ví dụ http://192.168.1.10:8082.",
+      VERIFY_SCHEMA_UNSUPPORTED:
+        "Backend trả báo cáo verify theo schema mà bàn thử này chưa đọc được (đang hỗ trợ schema 6.x). Cần cập nhật lại bộ chuyển đổi trong lib/types/verification.ts.",
+      FILE_EMPTY: "File rỗng.",
+      FILE_READ_FAILED: "Không đọc được file đã tải lên. Vui lòng thử lại.",
+      VALIDATION_FAILED: "Yêu cầu verify không hợp lệ.",
+      FILE_TOO_LARGE: "File vượt quá giới hạn 32 MiB.",
+      INTERNAL_ERROR: "Dịch vụ verify gặp lỗi nội bộ khi xử lý file này.",
+      ALLOWLIST_HOST_EMPTY: "Không xác định được host để thêm vào allowlist.",
+      unknownError: (code: string) => `Đã xảy ra lỗi không xác định khi verify (${code}).`,
+    },
+    ux: {
+      overview: "Tổng quan",
+      advanced: "Thông tin nâng cao",
+      viewTablistAriaLabel: "Chế độ hiển thị kết quả xác thực",
+      verificationResult: "Kết quả xác thực",
+      signatures: "Chữ ký",
+      signer: "Người ký",
+      trust: "Tin cậy",
+      signingTime: "Thời gian ký",
+      userChecks: "Kiểm tra chính",
+      integrity: "Tính toàn vẹn nội dung",
+      integrityDescription: "Kiểm tra phạm vi nội dung mà chữ ký bảo vệ.",
+      cryptography: "Giá trị chữ ký",
+      cryptographyDescription: "Kiểm tra chữ ký bằng khóa công khai của người ký.",
+      identityCertificate: "Danh tính & chứng thư",
+      identityCertificateDescription: "Kiểm tra đường dẫn chứng thư tới nguồn tin cậy.",
+      trustedTime: "Thời gian tin cậy",
+      trustedTimeDescription: "Kiểm tra dấu thời gian có thể dùng làm bằng chứng thời gian hay không.",
+      needsAttention: "Cần chú ý",
+      noResignRequired: "Không cần ký lại tài liệu",
+      laterRevisionTitle: "Có cập nhật sau chữ ký này",
+      laterRevisionDescription:
+        "Chữ ký không bao phủ trạng thái mới nhất của tài liệu. Xem Phạm vi ký trong tab nâng cao để rà soát các revision sau ký.",
+      advancedDescription: "Thông tin dành cho developer, auditor hoặc quản trị viên khi cần chẩn đoán kết quả xác thực.",
+      advancedNavAriaLabel: "Điều hướng thông tin nâng cao",
+      sections: {
+        technical: "Môi trường xác thực",
+        checks: "Các bước kiểm tra",
+        timestamp: "Dấu thời gian",
+        scope: "Phạm vi ký",
+        issues: "Vấn đề & xử lý",
+        raw: "Raw JSON",
+      },
+      reportMetadata: "Thông tin lần xác thực",
+      trustDomain: "Trust domain",
+      signerTrust: "Signer trust",
+      tsaTrust: "TSA trust",
+      anchorsCount: (n: number) => `${n} gốc tin cậy`,
+      signatureMetadata: "Thông tin kỹ thuật chữ ký",
+      mainIndication: "Main indication",
+      subIndications: "Sub-indications",
+      signatureId: "Signature ID",
+      copyJson: "Sao chép JSON",
+      details: "Xem chi tiết",
     },
   },
 

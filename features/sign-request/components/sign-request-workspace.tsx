@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useLocale } from "@/components/i18n/locale-provider";
 import { useToast } from "@/components/ui/toast";
 import { StepProgress } from "@/components/ui/step-progress";
@@ -63,10 +63,22 @@ export function SignRequestWorkspace() {
   const [document, setDocument] = useState<File>();
   const [draft, setDraft] = useState<SignRequestDraft>(() => createDraft());
   const [record, setRecord] = useState<SignRequestRecord>();
-  const [drag, setDrag] = useState<FlowDrag>();
+  const [drag, setDragState] = useState<FlowDrag>();
+  const dragRef = useRef<FlowDrag | undefined>(undefined);
   const [selectedStepId, setSelectedStepId] = useState(() => draft.steps[0].id);
   const [openSlotId, setOpenSlotId] = useState<string>();
   const [submitting, setSubmitting] = useState(false);
+
+  function setDrag(next?: FlowDrag) {
+    /*
+    * Ref được cập nhật đồng bộ ngay lập tức để native DnD
+    * luôn đọc được payload hiện tại.
+    *
+    * State vẫn được giữ để FlowCanvas render trạng thái hover.
+    */
+    dragRef.current = next;
+    setDragState(next);
+  }
 
   const documentFormat = useMemo(
     () => (document ? detectDocumentFormat(document) : undefined),
@@ -101,41 +113,104 @@ export function SignRequestWorkspace() {
   }
 
   function dropOnStep(stepId: string, index?: number) {
-    if (!drag) return;
+    const currentDrag = dragRef.current;
+
+    if (!currentDrag) return;
+
     setSelectedStepId(stepId);
 
-    if (drag.kind === "slot") {
-      patchSteps(moveSlot(draft.steps, drag.slotId, stepId, index));
+    /*
+    * Slot đã tồn tại trong flow:
+    * chỉ di chuyển sang Step/vị trí mới.
+    */
+    if (currentDrag.kind === "slot") {
+      patchSteps(
+        moveSlot(
+          draft.steps,
+          currentDrag.slotId,
+          stepId,
+          index
+        )
+      );
+
       return;
     }
 
-    const slot = slotFromDrag(drag);
+    /*
+    * User/link từ palette:
+    * tạo SignatureSlot mới rồi insert vào Step.
+    */
+    const slot = slotFromDrag(currentDrag);
+
     if (!slot) return;
-    patchSteps(insertSlot(draft.steps, stepId, slot, index));
-    // Người ký qua link chưa có email — mở luôn hộp thoại thay vì để họ tự phát
-    // hiện ra ô đang thiếu thứ gì ở bước xác nhận.
-    if (drag.kind === "link") setOpenSlotId(slot.id);
+
+    patchSteps(
+      insertSlot(
+        draft.steps,
+        stepId,
+        slot,
+        index
+      )
+    );
+
+    /*
+    * Với link signer chưa có thông tin,
+    * mở luôn dialog cấu hình.
+    */
+    if (currentDrag.kind === "link") {
+      setOpenSlotId(slot.id);
+    }
   }
 
   function dropAsNewStep() {
-    if (!drag) return;
+    const currentDrag = dragRef.current;
 
-    if (drag.kind === "slot") {
-      const found = findSlot(draft.steps, drag.slotId);
+    if (!currentDrag) return;
+
+    /*
+    * Slot đang tồn tại:
+    * lấy nó khỏi Step hiện tại rồi tạo Step mới.
+    */
+    if (currentDrag.kind === "slot") {
+      const found = findSlot(draft.steps, currentDrag.slotId);
+
       if (!found) return;
-      const stripped = removeSlotFrom(draft.steps, drag.slotId);
-      const next = [...stripped, createStep([found.slot])];
+
+      const stripped = removeSlotFrom(
+        draft.steps,
+        currentDrag.slotId
+      );
+
+      const next = [
+        ...stripped,
+        createStep([found.slot])
+      ];
+
       patchSteps(next);
       setSelectedStepId(next[next.length - 1].id);
+
       return;
     }
 
-    const slot = slotFromDrag(drag);
+    /*
+    * User/link từ palette:
+    * tạo slot mới rồi tạo Step mới chứa slot đó.
+    */
+    const slot = slotFromDrag(currentDrag);
+
     if (!slot) return;
-    const next = [...draft.steps, createStep([slot])];
+
+    const next = [
+      ...draft.steps,
+      createStep([slot])
+    ];
+
     patchSteps(next);
     setSelectedStepId(next[next.length - 1].id);
-    if (drag.kind === "link") setOpenSlotId(slot.id);
+
+    if (currentDrag.kind === "link") {
+      setOpenSlotId(slot.id);
+    }
   }
 
   /* -------------------- Thao tác bằng nút -------------------- */

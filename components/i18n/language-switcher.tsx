@@ -19,7 +19,7 @@ export function LanguageSwitcher() {
     <div
       role="radiogroup"
       aria-label={t.shell.language.ariaLabel}
-      className="inline-flex gap-0.5 rounded-lg bg-inset p-[3px]"
+      className="inline-flex gap-0.5 rounded-lg bg-inset p-0.75"
     >
       {OPTIONS.map((option) => {
         const active = locale === option.value;

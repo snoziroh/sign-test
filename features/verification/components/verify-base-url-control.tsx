@@ -80,7 +80,7 @@ function VerifyBaseUrlDialog({ onClose }: { onClose: () => void }) {
         ok: false,
         message:
           error instanceof VerifyApiClientError
-            ? describeVerifyError(error.code, error.detail)
+            ? describeVerifyError(t, error.code, error.detail)
             : a.testFailed,
       });
     } finally {

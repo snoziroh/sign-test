@@ -65,7 +65,7 @@ export function SignerPalette({
       </div>
 
       <section className="flex flex-col gap-1.5">
-        <h4 className="font-mono text-[10px] uppercase tracking-[0.1em] text-fg-subtle">
+        <h4 className="font-mono text-[10px] uppercase tracking-widest text-fg-subtle">
           {p.systemGroup}
         </h4>
 
@@ -123,7 +123,7 @@ export function SignerPalette({
       </section>
 
       <section className="flex flex-col gap-1.5">
-        <h4 className="font-mono text-[10px] uppercase tracking-[0.1em] text-fg-subtle">
+        <h4 className="font-mono text-[10px] uppercase tracking-widest text-fg-subtle">
           {p.linkGroup}
         </h4>
 

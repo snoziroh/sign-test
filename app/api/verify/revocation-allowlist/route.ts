@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
 
     const body = (await response.json().catch(() => ({}))) as {
       code?: string;
-      meta?: { correlationId?: string | null };
+      correlationId?: string | null;
     };
     const headers = correlationHeaders(response, body);
 

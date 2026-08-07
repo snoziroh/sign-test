@@ -6,22 +6,21 @@ import {
   verifyApiFetch,
   verifyErrorResponse,
 } from "@/lib/server/verify-proxy";
-import { adaptV5ReportToView, type VerificationReportV5 } from "@/lib/types/verification";
+import { adaptV6ReportToView, type VerificationReportV6 } from "@/lib/types/verification";
 
 /**
  * `POST /api/v1/verify` của verification-service — thẩm định một tệp đã ký.
  *
- * Khác mọi route ký ở ba điểm:
+ * Khác mọi route ký ở hai điểm:
  *
- * 1. **Có biến đổi body.** Backend trả báo cáo schema 5.x; giao diện đọc view
+ * 1. **Có biến đổi body.** Backend trả báo cáo schema 6.x; giao diện đọc view
  *    model đã giải hết tham chiếu ID. Chuyển đổi làm ở đây chứ không ở client để
  *    chỗ duy nhất biết tới schema backend là `lib/types/verification.ts`.
- * 2. **Body bị bọc HAI lớp `data`.** Controller trả `ApiResponse<VerificationReportResponse>`,
- *    nên `body.data` là báo cáo (`schemaVersion` / `run` / `data`) còn nội dung
- *    thật nằm ở `body.data.data`. Adapter nhận nguyên `body.data` — nó tự đi tiếp
- *    một lớp nữa. Bóc nhầm một lớp ở đây là mất `schemaVersion` và version gate
- *    sẽ ném lỗi trên một response hoàn toàn hợp lệ.
- * 3. **HTTP 200 KHÔNG có nghĩa chữ ký hợp lệ.** 200 chỉ nghĩa là verify chạy xong;
+ *    Từ 6.0.0, root KHÔNG còn bọc envelope `{ data, meta }` như schema 5 nữa —
+ *    `body` nhận trực tiếp từ backend chính là báo cáo (`schemaVersion` / `run` /
+ *    `data`), không phải `body.data`. Bóc nhầm một lớp ở đây là mất `schemaVersion`
+ *    và version gate sẽ ném lỗi trên một response hoàn toàn hợp lệ.
+ * 2. **HTTP 200 KHÔNG có nghĩa chữ ký hợp lệ.** 200 chỉ nghĩa là verify chạy xong;
  *    kết luận nằm ở `data.status` / `data.mainIndication`. Chữ ký hỏng vẫn trả
  *    200 — đừng "sửa" chỗ này thành ném lỗi khi status là INVALID.
  */
@@ -50,10 +49,10 @@ export async function POST(request: NextRequest) {
       body: formData,
     });
 
-    const body = (await response.json().catch(() => ({}))) as {
-      data?: VerificationReportV5;
+    const body = (await response.json().catch(() => ({}))) as Partial<VerificationReportV6> & {
       code?: string;
-      meta?: { correlationId?: string | null };
+      detail?: string;
+      correlationId?: string | null;
     };
 
     const headers = correlationHeaders(response, body);
@@ -75,7 +74,7 @@ export async function POST(request: NextRequest) {
 
     try {
       return NextResponse.json(
-        { data: adaptV5ReportToView(body.data as VerificationReportV5) },
+        { data: adaptV6ReportToView(body as VerificationReportV6) },
         { status: 200, headers },
       );
     } catch (error) {

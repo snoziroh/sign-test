@@ -55,6 +55,14 @@ function isSignerDrag(drag?: FlowDrag): boolean {
   return drag?.kind === "user" || drag?.kind === "link" || drag?.kind === "slot";
 }
 
+/**
+ * User/link được kéo từ palette sang canvas => copy.
+ * Slot đã nằm trong canvas và đang đổi vị trí => move.
+ */
+function signerDropEffect(drag?: FlowDrag): "copy" | "move" {
+  return drag?.kind === "slot" ? "move" : "copy";
+}
+
 export interface FlowEditHandlers {
   drag?: FlowDrag;
   setDrag: (drag?: FlowDrag) => void;
@@ -134,8 +142,10 @@ export function FlowCanvas({
           <div
             onDragOver={(event) => {
               if (!isSignerDrag(edit.drag)) return;
+
               event.preventDefault();
-              event.dataTransfer.dropEffect = "move";
+              event.dataTransfer.dropEffect = signerDropEffect(edit.drag);
+
               setOverNewStep(true);
             }}
             onDragLeave={(event) => {
@@ -232,18 +242,55 @@ function StepLane({
       onDragOver={
         edit
           ? (event: DragEvent<HTMLElement>) => {
-              if (edit.drag?.kind !== "step" || edit.drag.stepId === step.id) return;
-              event.preventDefault();
-              event.dataTransfer.dropEffect = "move";
-              hover.setOverStepId(step.id);
+              const drag = edit.drag;
+
+              if (!drag) return;
+
+              /*
+              * Kéo cả Step để đổi thứ tự.
+              */
+              if (drag.kind === "step") {
+                if (drag.stepId === step.id) return;
+
+                event.preventDefault();
+                event.dataTransfer.dropEffect = "move";
+
+                hover.setOverStepId(step.id);
+                return;
+              }
+
+              /*
+              * Kéo signer/link/slot vào Step.
+              *
+              * User và link đến từ palette => copy.
+              * Slot đã tồn tại => move.
+              */
+              if (isSignerDrag(drag)) {
+                event.preventDefault();
+                event.dataTransfer.dropEffect = signerDropEffect(drag);
+
+                hover.setOverStepId(step.id);
+              }
             }
           : undefined
       }
       onDragLeave={
         edit
           ? (event: DragEvent<HTMLElement>) => {
-              if (event.currentTarget.contains(event.relatedTarget as Node | null)) return;
+              /*
+              * Nếu chỉ đang di chuyển giữa các element con
+              * của cùng Step thì không xóa hover.
+              */
+              if (
+                event.currentTarget.contains(
+                  event.relatedTarget as Node | null
+                )
+              ) {
+                return;
+              }
+
               hover.setOverStepId(undefined);
+              hover.setOverSlot(undefined);
             }
           : undefined
       }
@@ -251,11 +298,39 @@ function StepLane({
         edit
           ? (event: DragEvent<HTMLElement>) => {
               const drag = edit.drag;
-              if (drag?.kind !== "step") return;
-              event.preventDefault();
-              edit.moveStepById(drag.stepId, index);
-              edit.setDrag(undefined);
-              hover.clearHover();
+
+              if (!drag) return;
+
+              /*
+              * Đổi vị trí cả Step.
+              */
+              if (drag.kind === "step") {
+                if (drag.stepId === step.id) return;
+
+                event.preventDefault();
+
+                edit.moveStepById(drag.stepId, index);
+                edit.setDrag(undefined);
+                hover.clearHover();
+
+                return;
+              }
+
+              /*
+              * Thả signer vào Step.
+              *
+              * Nếu drop xảy ra trên <ul> bên dưới thì <ul>
+              * đã stopPropagation(), nên đoạn này chỉ xử lý
+              * những vùng khác như header/body của Step.
+              */
+              if (isSignerDrag(drag)) {
+                event.preventDefault();
+
+                edit.dropOnStep(step.id);
+
+                edit.setDrag(undefined);
+                hover.clearHover();
+              }
             }
           : undefined
       }
@@ -394,7 +469,7 @@ function StepLane({
                 if (!isSignerDrag(edit.drag)) return;
                 event.preventDefault();
                 event.stopPropagation();
-                event.dataTransfer.dropEffect = "move";
+                event.dataTransfer.dropEffect = signerDropEffect(edit.drag);
                 hover.setOverStepId(step.id);
               }
             : undefined

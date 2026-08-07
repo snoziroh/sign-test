@@ -105,6 +105,17 @@ export const en = {
     navigationTitle: "Navigation",
     backToHome: "Home",
     open: "Open",
+    home:"Home",
+    openNavigation:"Open navigation",
+    openSettings:"Open settings",
+    mobileNavigationTitle:"Navigation",
+    mobileNavigationDescription:"Move between application screens.",
+    settingsTitle:"Settings",
+    settingsDescription:"Application preferences.",
+    language:"Language",
+    languageDescription:"Interface language.",
+    theme:"Theme",
+    themeDescription:"Interface appearance."
   },
 
   shell: {
@@ -1147,7 +1158,11 @@ export const en = {
       description:
         "Already merged and ordered by the verification service — work through them top to bottom.",
       requiresResigning: "Requires re-signing",
-      requiresNetwork: "Requires network access",
+      networkRequirement: {
+        NOT_REQUIRED: "No network access needed",
+        REQUIRED: "Requires network access",
+        CONDITIONAL: "May require network access",
+      },
       stage: {
         VERIFIER_CONFIGURATION: "Verifier configuration",
         DOCUMENT_GENERATION: "Document generation",
@@ -1282,12 +1297,114 @@ export const en = {
       rootCauses: "Root causes",
       consequences: (n: number) => (n === 1 ? "1 consequence of this" : `${n} consequences of this`),
       needsResigning: "The file must be re-signed",
+      byCode: {
+        SIGNER_TRUST_STORE_EMPTY: {
+          title: "Could not verify the signer's certificate source",
+          description:
+            "The signature may still be cryptographically correct, but the verifier has not been configured with a trust source to confirm the signer's certificate.",
+        },
+        TSA_TRUST_STORE_EMPTY: {
+          title: "Could not verify the timestamp source",
+          description:
+            "The timestamp may be cryptographically correct, but the verifier cannot anchor the TSA certificate to a trust source.",
+        },
+        ISSUER_CERTIFICATE_NOT_AVAILABLE: {
+          title: "Missing intermediate certificate",
+          description:
+            "The system does not yet have the certificates needed to build a complete certificate path.",
+        },
+        REVOCATION_NOT_EVALUATED: {
+          title: "Could not check revocation status",
+          description:
+            "This step was not run because an earlier dependent check did not complete — it does not mean the certificate has been revoked.",
+        },
+      } as Record<string, { title: string; description: string }>,
     },
     allowlist: {
       action: "Add to allowlist and re-verify",
       adding: "Working…",
       genericError: "Something went wrong. Please try again.",
       reverifyFailed: "Added to allowlist, but re-verification failed.",
+    },
+    summary: {
+      validSummary: (processed: number) =>
+        `Processed ${processed} signature${processed === 1 ? "" : "s"}. Checks required by the current policy have passed.`,
+      invalidSummary:
+        "A signature or content was found that does not meet verification requirements. Select the signature with an error status to see the cause.",
+      indeterminateSummary: (valid: number, processed: number) =>
+        `${valid}/${processed} signature(s) are cryptographically valid, but the system does not yet have enough grounds to fully conclude on trust, revocation or trusted time.`,
+      cryptoValidCount: (valid: number, processed: number) =>
+        `${valid}/${processed} cryptographically valid signature(s)`,
+      failedCount: (n: number) => `${n} failed signature${n === 1 ? "" : "s"}`,
+      indeterminateCount: (n: number) => `${n} signature${n === 1 ? "" : "s"} not fully conclusive`,
+      rootIssuesCount: (n: number) => `${n} root issue${n === 1 ? "" : "s"} to review`,
+    },
+    apiErrors: {
+      VERIFY_NOT_SUPPORTED:
+        "The service at this address has no verify endpoint (POST /api/v1/verify). Check the verification service address — the signing service cannot verify.",
+      ALLOWLIST_NOT_SUPPORTED:
+        "The service at this address has no revocation allowlist endpoint (POST /api/v1/revocation-allowlist).",
+      VERIFY_API_UNREACHABLE:
+        "Could not connect to the verification service. Check the address and whether the service is running.",
+      VERIFY_API_NOT_CONFIGURED:
+        "No verification service address is set. Set it in the configuration button above, or set VERIFY_API_URL in .env.local.",
+      VERIFY_API_BASE_URL_INVALID:
+        "The verification service address is invalid. It must be a full http:// or https:// URL, e.g. http://192.168.1.10:8082.",
+      VERIFY_SCHEMA_UNSUPPORTED:
+        "The backend returned a verification report in a schema this test bench cannot read yet (currently supporting schema 6.x). The converter in lib/types/verification.ts needs updating.",
+      FILE_EMPTY: "The file is empty.",
+      FILE_READ_FAILED: "Could not read the uploaded file. Please try again.",
+      VALIDATION_FAILED: "The verify request is invalid.",
+      FILE_TOO_LARGE: "The file exceeds the 32 MiB limit.",
+      INTERNAL_ERROR: "The verification service encountered an internal error while processing this file.",
+      ALLOWLIST_HOST_EMPTY: "Could not determine a host to add to the allowlist.",
+      unknownError: (code: string) => `An unknown error occurred while verifying (${code}).`,
+    },
+    ux: {
+      overview: "Overview",
+      advanced: "Advanced info",
+      viewTablistAriaLabel: "Verification result view",
+      verificationResult: "Verification result",
+      signatures: "Signatures",
+      signer: "Signer",
+      trust: "Trust",
+      signingTime: "Signing time",
+      userChecks: "Key checks",
+      integrity: "Content integrity",
+      integrityDescription: "Checks the scope of content the signature protects.",
+      cryptography: "Signature value",
+      cryptographyDescription: "Checks the signature using the signer's public key.",
+      identityCertificate: "Identity & certificate",
+      identityCertificateDescription: "Checks the certificate path to a trusted source.",
+      trustedTime: "Trusted time",
+      trustedTimeDescription: "Checks whether the timestamp can be used as proof of time.",
+      needsAttention: "Needs attention",
+      noResignRequired: "No need to re-sign the document",
+      laterRevisionTitle: "There is a later update to this signature",
+      laterRevisionDescription:
+        "The signature does not cover the document's latest state. See Signed scope in the advanced tab to review revisions made after signing.",
+      advancedDescription:
+        "Information for developers, auditors or administrators diagnosing a verification result.",
+      advancedNavAriaLabel: "Advanced information navigation",
+      sections: {
+        technical: "Verification environment",
+        checks: "Checks",
+        timestamp: "Timestamp",
+        scope: "Signed scope",
+        issues: "Issues & remediation",
+        raw: "Raw JSON",
+      },
+      reportMetadata: "Verification run info",
+      trustDomain: "Trust domain",
+      signerTrust: "Signer trust",
+      tsaTrust: "TSA trust",
+      anchorsCount: (n: number) => `${n} anchor${n === 1 ? "" : "s"}`,
+      signatureMetadata: "Signature technical info",
+      mainIndication: "Main indication",
+      subIndications: "Sub-indications",
+      signatureId: "Signature ID",
+      copyJson: "Copy JSON",
+      details: "View details",
     },
   },
 

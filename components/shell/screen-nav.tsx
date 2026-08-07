@@ -2,18 +2,10 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+
 import { useLocale } from "@/components/i18n/locale-provider";
 import { SCREEN_ROUTES } from "@/components/shell/routes";
 
-/**
- * Chuyển giữa ba màn của bàn thử. Dùng `Link` chứ không phải nút đổi tab trong
- * cùng một trang: mỗi màn giữ trạng thái nặng riêng (tệp đang chọn, preview đã
- * render, phiên ký đang chạy), và một URL riêng cho phép mở hai màn ở hai tab
- * cùng lúc — thứ hay dùng khi ký ở tab này rồi verify kết quả ở tab kia.
- *
- * Chỉ là nhóm tab: lối quay về `/` và khoảng cách quanh nó do `AppNavbar` đặt,
- * vì cụm này chỉ xuất hiện bên trong navbar.
- */
 export function ScreenNav() {
   const pathname = usePathname();
   const { t } = useLocale();
@@ -24,20 +16,29 @@ export function ScreenNav() {
   }));
 
   return (
-    <nav aria-label={t.nav.primaryLabel}>
-      <ul className="inline-flex gap-0.5 rounded-lg bg-inset p-[3px]">
+    <nav
+      aria-label={t.nav.primaryLabel}
+      className="flex h-9 items-center"
+    >
+      <ul className="inline-flex h-9 items-center gap-0.5 rounded-lg bg-inset p-0.75">
         {items.map((item) => {
           const active = pathname === item.href;
+
           return (
-            <li key={item.href}>
+            <li
+              key={item.href}
+              className="h-full"
+            >
               <Link
                 href={item.href}
                 aria-current={active ? "page" : undefined}
-                className={
+                className={[
+                  "flex h-full items-center rounded-md px-3.5",
+                  "text-[12.5px] leading-none transition-colors",
                   active
-                    ? "block rounded-md bg-surface px-3.5 py-1.5 text-[12.5px] font-semibold text-fg shadow-sm"
-                    : "block rounded-md px-3.5 py-1.5 text-[12.5px] font-medium text-fg-muted hover:text-fg"
-                }
+                    ? "bg-surface font-semibold text-fg shadow-sm"
+                    : "font-medium text-fg-muted hover:text-fg",
+                ].join(" ")}
               >
                 {item.label}
               </Link>

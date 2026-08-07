@@ -134,7 +134,7 @@ không ai tưởng màn hình đang nói chuyện với dịch vụ thật.
 ## Màn verify
 
 `POST /api/v1/verify` của verification-service, multipart một part `file`. Thả
-một tệp đã ký vào, nhận báo cáo thẩm định **schema 5.x**: kết luận mức tài liệu,
+một tệp đã ký vào, nhận báo cáo thẩm định **schema 6.x**: kết luận mức tài liệu,
 kết luận từng chữ ký, chín bước engine đã kiểm tra, chuỗi chứng thư, dấu thời
 gian kèm chuỗi TSA riêng, manifest, danh sách issue và danh sách việc cần làm.
 
@@ -161,9 +161,9 @@ Sáu điều dễ đọc sai kết quả:
    Một issue `ERROR` không tự làm chữ ký `TOTAL_FAILED`; và trust store rỗng là
    `ERROR` nhưng `fileNeedsResigning: false`.
 
-Body của backend bọc **hai lớp `data`** (`ApiResponse<VerificationReportResponse>`).
-Chỗ duy nhất bóc là `app/api/verify/route.ts`; nó truyền nguyên `body.data` cho
-adapter, còn adapter tự đi tiếp một lớp.
+Từ schema 6, body của backend không còn bọc envelope `{ data, meta }` như schema
+5 nữa — root nhận thẳng `schemaVersion` / `run` / `data`. `app/api/verify/route.ts`
+truyền nguyên body cho adapter, không bóc lớp nào thêm.
 
 Chuỗi của TSA tách riêng khỏi chuỗi người ký vì một dấu thời gian chỉ dùng làm
 mốc thời gian tin cậy khi **chính nó** neo được vào một anchor —
@@ -208,7 +208,7 @@ features/verification/
 lib/server/sign-proxy.ts           chỗ DUY NHẤT chạm tới địa chỉ dịch vụ ký
 lib/server/verify-proxy.ts         chỗ DUY NHẤT chạm tới địa chỉ dịch vụ verify
 lib/types/signing.ts               contract luồng ký
-lib/types/verification.ts          contract verify schema 5.x + adapter sang view model
+lib/types/verification.ts          contract verify schema 6.x + adapter sang view model
 lib/i18n/                          từ điển EN/VI
 ```
 

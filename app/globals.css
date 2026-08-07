@@ -86,6 +86,10 @@
   --shadow-md: var(--shadow-md);
 }
 
+html {
+  scrollbar-gutter: stable;
+}
+
 body {
   background: var(--surface-2);
   color: var(--fg);
@@ -132,5 +136,54 @@ body {
   to {
     opacity: 1;
     transform: translateY(0) scale(1);
+  }
+}
+
+.app-dialog {
+  opacity: 0;
+  transform: translateY(6px) scale(0.985);
+
+  transition:
+    opacity 140ms ease,
+    transform 140ms ease,
+    display 140ms allow-discrete,
+    overlay 140ms allow-discrete;
+}
+
+.app-dialog[open] {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+@starting-style {
+  .app-dialog[open] {
+    opacity: 0;
+    transform: translateY(6px) scale(0.985);
+  }
+}
+
+.app-dialog::backdrop {
+  background: transparent;
+
+  transition:
+    background 140ms ease,
+    display 140ms allow-discrete,
+    overlay 140ms allow-discrete;
+}
+
+.app-dialog[open]::backdrop {
+  background: var(--overlay);
+}
+
+@starting-style {
+  .app-dialog[open]::backdrop {
+    background: transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-dialog,
+  .app-dialog::backdrop {
+    transition: none;
   }
 }

@@ -21,7 +21,7 @@ export function ThemeSwitcher() {
     <div
       role="radiogroup"
       aria-label={t.shell.theme.ariaLabel}
-      className="inline-flex gap-0.5 rounded-lg bg-inset p-[3px]"
+      className="inline-flex gap-0.5 rounded-lg bg-inset p-0.75"
     >
       {OPTIONS.map((option) => {
         const active = preference === option.value;

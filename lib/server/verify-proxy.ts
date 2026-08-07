@@ -70,17 +70,21 @@ interface BackendErrorBody {
   detail?: string;
   message?: string;
   error?: { code?: string; detail?: string; message?: string };
-  meta?: { correlationId?: string | null };
+  /** RFC 7807 (mục 2 api-verify.md): mã tra cứu nằm thẳng ở root của body lỗi. */
+  correlationId?: string | null;
+  /** Body thành công của `/api/v1/verify` (schema 6): mã tra cứu nằm ở `run.correlationId`. */
+  run?: { correlationId?: string | null };
 }
 
 /**
- * Mã tra cứu: ưu tiên header, rồi tới `meta.correlationId` trong body. Schema 4
- * đặt nó trong body nên nếu chỉ đọc header là mất luôn mã duy nhất nối được log
- * hai bên khi cần báo lỗi.
+ * Mã tra cứu: ưu tiên header (server luôn echo lại), rồi tới body — vị trí trong
+ * body khác nhau tuỳ hình dạng: lỗi RFC 7807 để nó ở root (`body.correlationId`),
+ * báo cáo thành công để nó ở `body.run.correlationId`.
  */
 export function correlationHeaders(response: Response, body: BackendErrorBody): Headers {
   const headers = new Headers();
-  const id = response.headers.get("x-correlation-id") ?? body?.meta?.correlationId;
+  const id =
+    response.headers.get("x-correlation-id") ?? body?.correlationId ?? body?.run?.correlationId;
   if (id) headers.set("x-correlation-id", id);
   return headers;
 }

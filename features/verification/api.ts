@@ -2,6 +2,7 @@
 
 import type { VerificationReport } from "@/lib/types/verification";
 import { verifyBaseUrlHeaders } from "@/features/verification/verify-base-url";
+import type { Dictionary } from "@/lib/i18n";
 
 /**
  * Client của luồng verify. Cùng quy ước với `features/signing/sign-api.ts`: mọi
@@ -135,37 +136,9 @@ export async function addToAllowlistAndReverify(
   return verifyFile(file);
 }
 
-const VERIFY_ERROR_MESSAGES: Record<string, string> = {
-  /* Lớp proxy của bàn thử này — không phải mã của backend. */
-  VERIFY_NOT_SUPPORTED:
-    "Dịch vụ ở địa chỉ này không có endpoint verify (POST /api/v1/verify). Kiểm tra lại địa chỉ dịch vụ verify — dịch vụ ký không thẩm định được.",
-  ALLOWLIST_NOT_SUPPORTED:
-    "Dịch vụ ở địa chỉ này không có endpoint allowlist thu hồi (POST /api/v1/revocation-allowlist).",
-  VERIFY_API_UNREACHABLE:
-    "Không kết nối được tới dịch vụ verify. Kiểm tra lại địa chỉ và xem service đã chạy chưa.",
-  VERIFY_API_NOT_CONFIGURED:
-    "Chưa có địa chỉ dịch vụ verify. Đặt địa chỉ ở nút cấu hình phía trên, hoặc đặt VERIFY_API_URL trong .env.local.",
-  VERIFY_API_BASE_URL_INVALID:
-    "Địa chỉ dịch vụ verify không hợp lệ. Phải là URL http:// hoặc https:// đầy đủ, ví dụ http://localhost:8082.",
-  VERIFY_SCHEMA_UNSUPPORTED:
-    "Backend trả báo cáo verify theo schema mà bàn thử này chưa đọc được (đang hỗ trợ schema 5.x). Cần cập nhật lại bộ chuyển đổi trong lib/types/verification.ts.",
-
-  /*
-   * Mã của backend. Danh sách đầy đủ của verification-service chỉ có năm mã dưới
-   * đây — mọi thứ khác đi qua nhánh fallback bên dưới và hiện nguyên văn.
-   */
-  FILE_EMPTY: "File rỗng.",
-  FILE_READ_FAILED: "Không đọc được file đã tải lên. Vui lòng thử lại.",
-  VALIDATION_FAILED: "Yêu cầu verify không hợp lệ.",
-  FILE_TOO_LARGE: "File vượt quá giới hạn 32 MiB.",
-  INTERNAL_ERROR: "Dịch vụ verify gặp lỗi nội bộ khi xử lý file này.",
-
-  /* Mã của endpoint allowlist thu hồi — cùng service, khác đường. */
-  ALLOWLIST_HOST_EMPTY: "Không xác định được host để thêm vào allowlist.",
-};
-
-export function describeVerifyError(code: string, detail?: string): string {
-  const known = VERIFY_ERROR_MESSAGES[code];
-  if (known) return detail ? `${known} (${detail})` : known;
-  return detail ? `${code} — ${detail}` : `Đã xảy ra lỗi không xác định khi verify (${code}).`;
+export function describeVerifyError(t: Dictionary, code: string, detail?: string): string {
+  const known = (t.verify.apiErrors as Record<string, unknown>)[code];
+  const knownMessage = typeof known === "string" ? known : undefined;
+  if (knownMessage) return detail ? `${knownMessage} (${detail})` : knownMessage;
+  return detail ? `${code} — ${detail}` : t.verify.apiErrors.unknownError(code);
 }

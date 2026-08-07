@@ -8,15 +8,16 @@
  *
  * File này giữ HAI shape:
  *
- * - `VerificationReportV5` — đúng những gì `POST /api/v1/verify` của
- *   verification-service trả về (schema 5.x).
+ * - `VerificationReportV6` — đúng những gì `POST /api/v1/verify` của
+ *   verification-service trả về (schema 6.x, root phẳng — không còn envelope
+ *   `{ data, meta }` như schema 5).
  * - `VerificationReport` — view model mà giao diện đọc.
  *
- * `adaptV5ReportToView` là cầu nối duy nhất giữa hai shape đó.
+ * `adaptV6ReportToView` là cầu nối duy nhất giữa hai shape đó.
  *
  * ## Vì sao view model không còn phẳng như thời schema 4
  *
- * Schema 5 tách báo cáo thành bốn lớp — dữ liệu đọc từ tệp, kết quả sau khi áp
+ * Schema 5/6 tách báo cáo thành bốn lớp — dữ liệu đọc từ tệp, kết quả sau khi áp
  * policy, danh sách vấn đề, và hành động khắc phục — rồi để ba lớp sau **tham
  * chiếu lẫn nhau bằng ID** thay vì nhúng lặp nội dung. Adapter ở đây làm đúng một
  * việc: giải các tham chiếu đó thành object để giao diện không phải tự dựng map.
@@ -52,7 +53,7 @@ export type VerificationStatus = "VALID" | "INVALID" | "INDETERMINATE";
 /**
  * `(string & {})` ở cuối các union dưới đây là có chủ đích: giữ gợi ý IDE cho
  * những giá trị đã biết nhưng KHÔNG vỡ khi backend thêm mã mới trong cùng
- * schema 5.x. Báo cáo verify là dữ liệu để đọc, không phải giá trị để rẽ nhánh
+ * schema 6.x. Báo cáo verify là dữ liệu để đọc, không phải giá trị để rẽ nhánh
  * bắt buộc — một mã lạ phải hiện ra nguyên văn chứ không được làm hỏng màn hình.
  */
 export type MainIndication = "TOTAL_PASSED" | "TOTAL_FAILED" | "INDETERMINATE";
@@ -79,7 +80,7 @@ export type SubIndication =
   | (string & {});
 
 /**
- * Bảy trạng thái của schema 5 — KHÔNG phải boolean, và không rút gọn được về
+ * Bảy trạng thái của schema 6 — KHÔNG phải boolean, và không rút gọn được về
  * boolean. Xem ghi chú (2) ở đầu file về `NOT_EVALUATED` vs `INDETERMINATE`.
  */
 export type CheckOutcome =
@@ -161,6 +162,12 @@ export type CertificateSource =
 export type ScopeType = "PDF_BYTE_RANGE" | "XML_REFERENCES" | "OOXML_PACKAGE_REFERENCES";
 export type DetectedType = "PDF" | "XML" | "OOXML" | "ASIC" | "UNKNOWN";
 export type NetworkMode = "OFFLINE" | "ONLINE_ALLOWED" | "ONLINE_REQUIRED";
+/**
+ * `MASKED` (mặc định) — mọi DN trong response đã bị che (CCCD/MST/email/SĐT chỉ
+ * còn vài ký tự cuối). Đừng coi giá trị đã che là dữ liệu đối soát định danh gốc.
+ */
+export type PiiExposureMode = "MASKED" | "FULL";
+export type NetworkRequirement = "NOT_REQUIRED" | "REQUIRED" | "CONDITIONAL";
 export type TrustDomainStatus = "READY" | "NOT_CONFIGURED" | "STALE" | "ERROR";
 export type ModificationStatus = "NONE" | "PRESENT_ALLOWED" | "PRESENT_FORBIDDEN" | "UNKNOWN";
 export type ModificationPolicyResult = "ALLOWED" | "FORBIDDEN" | "UNKNOWN" | "NOT_APPLICABLE";
@@ -210,32 +217,36 @@ export const VALIDATION_GROUPS: ValidationGroup[] = [
 ];
 
 /* ------------------------------------------------------------------ *
- * Schema 5.x — đúng shape của POST /api/v1/verify
+ * Schema 6.x — đúng shape của POST /api/v1/verify
  *
- * Lưu ý null: backend áp `@JsonInclude(NON_NULL)` ở MỘT SỐ record chứ không phải
- * tất cả, nên cùng một khái niệm có thể vắng key hoặc có key với giá trị `null`
- * tuỳ nó nằm ở đâu. Mọi field dưới đây vì vậy đều `?` và/hoặc `| null`, và mọi
- * chỗ đọc phải dùng optional chaining — đừng phân biệt "thiếu key" với "null".
+ * `@JsonInclude(NON_NULL)` đã bị gỡ khỏi toàn bộ contract kể từ 6.0.0, trừ
+ * đúng một record: `Scope` (nhánh PDF vs XML/OOXML là `oneOf`, không phải field
+ * chưa có giá trị — xem `ScopeV6`). Mọi field khác ở schema 6 LUÔN có mặt trong
+ * JSON, mang `null` khi chưa xác định — không còn khái niệm "vắng key". Type ở
+ * đây vẫn giữ `?`/`| null` cho an toàn (phòng khi backend đi trước schema), và
+ * mọi chỗ đọc vẫn phải dùng optional chaining — đừng phân biệt "thiếu key" với
+ * "null", với schema 6 chúng đồng nhất.
+ *
+ * Root response KHÔNG còn envelope `{ data, meta }` như schema 5:
+ * `schemaVersion`/`run`/`data` nằm thẳng ở root, và `run.correlationId` thay
+ * cho `meta.correlationId`.
  * ------------------------------------------------------------------ */
 
-export interface ApiEnvelope<T> {
-  data: T;
-  meta?: { correlationId?: string | null; nextCursor?: string | null } | null;
-}
-
-export interface EtsiV5 {
+export interface EtsiV6 {
   mainIndication: MainIndication;
   subIndications?: SubIndication[] | null;
+  /** Nguyên nhân nội bộ khi không có sub-indication ETSI tương ứng. Mới ở 6.0.0. */
+  internalReasonCodes?: string[] | null;
 }
 
-export interface DigestV5 {
+export interface DigestV6 {
   algorithm?: string | null;
   declaredValue?: string | null;
   computedValue?: string | null;
   matched?: boolean | null;
 }
 
-export interface DocumentInfoV5 {
+export interface DocumentInfoV6 {
   documentId: string;
   fileName?: string;
   fileSize: number;
@@ -255,7 +266,14 @@ export interface DocumentInfoV5 {
     ambiguousObjectsDetected?: boolean;
     warnings?: string[];
   };
-  signatureInventory?: { detected: number; processed: number; unsupported: number };
+  signatureInventory?: {
+    /** Đổi tên từ `detected` ở schema 5. */
+    signaturesDetected: number;
+    /** Mới ở 6.0.0 — tách khỏi `signaturesDetected`: 1 chữ ký mang timestamp KHÔNG phải 2 chữ ký. */
+    timestampsDetected: number;
+    processed: number;
+    unsupported: number;
+  };
   securityObservations?: {
     activeContentDetected?: boolean;
     embeddedFilesDetected?: boolean;
@@ -263,7 +281,7 @@ export interface DocumentInfoV5 {
   };
 }
 
-export interface TrustDomainRefV5 {
+export interface TrustDomainRefV6 {
   id: string;
   version?: string | null;
   sha256?: string | null;
@@ -271,7 +289,7 @@ export interface TrustDomainRefV5 {
   status: TrustDomainStatus;
 }
 
-export interface ValidationContextV5 {
+export interface ValidationContextV6 {
   policy?: { id: string; version: string; sha256?: string };
   cryptographicPolicy?: { id: string; version: string; sha256?: string };
   referenceTime?: {
@@ -280,17 +298,19 @@ export interface ValidationContextV5 {
     source: ReferenceTimeSource;
     trustedForProofOfExistence: boolean;
   } | null;
-  trustDomain?: { signer?: TrustDomainRefV5 | null; tsa?: TrustDomainRefV5 | null } | null;
+  trustDomain?: { signer?: TrustDomainRefV6 | null; tsa?: TrustDomainRefV6 | null } | null;
   network?: {
     mode: NetworkMode;
     externalAccessAttempted: boolean;
     reasonNotAttempted?: string;
     timeoutMs?: number;
   };
+  /** Mới ở 6.0.0 — response này đã che PII hay chưa. */
+  piiExposureMode?: PiiExposureMode | null;
 }
 
-export interface SummaryV5 {
-  etsi: EtsiV5;
+export interface SummaryV6 {
+  etsi: EtsiV6;
   validationCompleteness?: ValidationCompleteness | null;
   signatureStatistics?: {
     detected: number;
@@ -309,7 +329,7 @@ export interface SummaryV5 {
   rootIssueIds?: string[];
 }
 
-export interface RevisionV5 {
+export interface RevisionV6 {
   revisionNumber: number;
   startOffset: number;
   endOffset: number;
@@ -319,7 +339,7 @@ export interface RevisionV5 {
   sha256?: string | null;
 }
 
-export interface XmlReferenceV5 {
+export interface XmlReferenceV6 {
   referenceId?: string;
   uri?: string;
   type?: string;
@@ -332,10 +352,10 @@ export interface XmlReferenceV5 {
     external?: boolean;
   };
   transforms?: { order: number; algorithm: string; policyResult: string }[];
-  digest?: DigestV5;
+  digest?: DigestV6;
 }
 
-export interface ScopeV5 {
+export interface ScopeV6 {
   type?: ScopeType;
   byteRange?: number[];
   includedRanges?: { offset: number; length: number }[];
@@ -347,20 +367,26 @@ export interface ScopeV5 {
   coversCurrentDocument?: boolean;
   unsignedTrailingBytes?: number;
   signatureElementPath?: string;
-  references?: XmlReferenceV5[];
+  references?: XmlReferenceV6[];
   allRequiredBusinessObjectsCovered?: boolean;
   wrappingAttackIndicators?: string[];
 }
 
-export interface CryptographyV5 {
+export interface CryptographyV6 {
   container?: {
     filter?: string;
     subFilter?: string;
     cmsParseStatus?: CheckOutcome;
     detachedContent?: boolean;
     canonicalizationMethod?: string;
+    /**
+     * Mới ở 6.0.0 — bằng chứng cho quan hệ countersignature. `kind` chỉ trả
+     * `COUNTERSIGNATURE` khi giá trị này > 0 (unsigned attribute id-countersignature
+     * thật sự có trong container CMS), không còn suy từ khoá quy trình nghiệp vụ.
+     */
+    cmsCountersignatureCount?: number | null;
   };
-  contentDigest?: DigestV5;
+  contentDigest?: DigestV6;
   signatureValue?: { algorithm?: string; oid?: string; valid?: boolean };
   key?: { algorithm?: string; size?: number; parameters?: string };
   signedAttributes?: {
@@ -379,7 +405,7 @@ export interface CryptographyV5 {
   } | null;
 }
 
-export interface CandidatePathV5 {
+export interface CandidatePathV6 {
   pathId: string;
   /** Thứ tự leaf → intermediate → root. */
   certificateIds?: string[];
@@ -389,7 +415,7 @@ export interface CandidatePathV5 {
   failureReasons?: string[];
 }
 
-export interface CertificateRevocationV5 {
+export interface CertificateRevocationV6 {
   certificateId?: string;
   status: CheckOutcome;
   certificateStatus?: string;
@@ -400,11 +426,11 @@ export interface CertificateRevocationV5 {
   revocationTime?: string;
 }
 
-export interface TimestampV5 {
+export interface TimestampV6 {
   timestampId: string;
   type?: string;
   tokenParseStatus?: CheckOutcome;
-  messageImprint?: DigestV5 & { protectedObject?: string };
+  messageImprint?: DigestV6 & { protectedObject?: string };
   tokenSignatureValid?: boolean;
   tsaCertificateId?: string;
   policyOid?: string;
@@ -420,10 +446,19 @@ export interface TimestampV5 {
   issueIds?: string[];
 }
 
-export interface ModificationsAfterSigningV5 {
+export type ChangeAnalysisStatus = "PERFORMED" | "NOT_PERFORMED";
+
+export interface ModificationsAfterSigningV6 {
+  /**
+   * `UNKNOWN` là trạng thái BÌNH THƯỜNG ở 6.0.0 khi `changeAnalysis` chưa chạy —
+   * KHÔNG phải lỗi. `PRESENT_ALLOWED` giờ chỉ được trả khi engine đã thực sự đối
+   * chiếu nội dung (`changeAnalysis: "PERFORMED"`).
+   */
   status?: ModificationStatus;
   laterRevisionNumbers?: number[];
   categories?: string[];
+  /** Mới ở 6.0.0 — engine đã đối chiếu nội dung giữa các revision hay chưa. */
+  changeAnalysis?: ChangeAnalysisStatus | null;
   docMdp?: { present: boolean; permissionLevel?: number; result?: CheckOutcome };
   fieldMdp?: { present: boolean; result?: CheckOutcome | null } | null;
   pageContentChanged?: boolean;
@@ -432,7 +467,7 @@ export interface ModificationsAfterSigningV5 {
   attachmentsChanged?: boolean;
 }
 
-export interface CheckV5 {
+export interface CheckV6 {
   checkId: string;
   type?: ValidationCheckType;
   outcome: CheckOutcome;
@@ -443,8 +478,8 @@ export interface CheckV5 {
   issueIds?: string[];
 }
 
-export interface SignatureValidationV5 {
-  etsi: EtsiV5;
+export interface SignatureValidationV6 {
+  etsi: EtsiV6;
   cryptographicIntegrity?: CheckOutcome | null;
   signedScope?: CheckOutcome | null;
   certificatePath?: CheckOutcome | null;
@@ -454,7 +489,7 @@ export interface SignatureValidationV5 {
   longTermValidation?: CheckOutcome | null;
 }
 
-export interface SignatureV5 {
+export interface SignatureV6 {
   signatureId: string;
   index: number;
   kind?: SignatureKind;
@@ -473,14 +508,23 @@ export interface SignatureV5 {
     rectangle?: { x: number; y: number; width: number; height: number } | null;
   };
   profile?: {
+    /** Mức phát hiện được — chỉ mang tính mô tả. KHÔNG hiển thị đây như "đạt profile X". */
     detected?: string;
     claimed?: string;
     conformanceStatus?: CheckOutcome;
+    /** "Đạt" thật sự dùng field này (hoặc `conformanceStatus`), không phải `detected`. */
     achieved?: string;
     missingForNextLevel?: string[];
+    /** Mới ở 6.0.0 — mức chắc chắn của việc nhận dạng `detected`/`claimed`. */
+    detectionStatus?: string | null;
+    detectionEvidence?: string[] | null;
+    missingDetectionEvidence?: string[] | null;
+    /** Mới ở 6.0.0 — mức kế tiếp, tách khỏi yêu cầu lưu trữ dài hạn (`missingForLta`). */
+    nextTarget?: string | null;
+    missingForLta?: string[] | null;
   };
-  validation: SignatureValidationV5;
-  scope?: ScopeV5;
+  validation: SignatureValidationV6;
+  scope?: ScopeV6;
   claimedProperties?: {
     signingTime?: {
       value: string;
@@ -491,7 +535,17 @@ export interface SignatureV5 {
     reason?: string;
     location?: string;
     contactInfo?: string;
-    signerName?: string;
+    /**
+     * Đổi tên + đổi hình dạng ở 6.0.0: trước là `signerName` (string), nay là object
+     * có nguồn gốc và độ tin cậy. Đây là lời khai của PDF (`/Name` trong dictionary
+     * chữ ký) — KHÔNG dùng làm danh tính hiển thị, danh tính lấy từ `signerIdentity.displayName`.
+     */
+    pdfSignerName?: {
+      value?: string | null;
+      source?: string | null;
+      cryptographicallyProtected?: boolean | null;
+      identityVerified?: boolean | null;
+    } | null;
   };
   signerIdentity?: {
     signingCertificateId?: string;
@@ -503,16 +557,16 @@ export interface SignatureV5 {
     country?: string;
     workflowIdentityMatch?: { status: CheckOutcome; expectedSignerId?: string | null };
   };
-  cryptography?: CryptographyV5;
+  cryptography?: CryptographyV6;
   certificateValidation?: {
     signingCertificateId?: string;
     embeddedCertificateIds?: string[];
-    candidatePaths?: CandidatePathV5[];
+    candidatePaths?: CandidatePathV6[];
     selectedPathId?: string;
     trustStatus?: CheckOutcome;
   };
-  revocation?: { overall: CheckOutcome; certificateResults?: CertificateRevocationV5[] };
-  timestamps?: TimestampV5[];
+  revocation?: { overall: CheckOutcome; certificateResults?: CertificateRevocationV6[] };
+  timestamps?: TimestampV6[];
   timeValidation?: {
     claimedSigningTime?: string;
     bestSignatureTime?: string;
@@ -521,7 +575,7 @@ export interface SignatureV5 {
     certificateEvaluationTimeType?: ReferenceTimeType;
     proofsOfExistence?: { timestampId: string; protectedObject: string; at: string }[];
   };
-  modificationsAfterSigning?: ModificationsAfterSigningV5;
+  modificationsAfterSigning?: ModificationsAfterSigningV6;
   longTermValidation?: {
     embeddedCertificateValues?: boolean;
     embeddedRevocationValues?: boolean;
@@ -537,12 +591,12 @@ export interface SignatureV5 {
     qualifiedCertificate?: boolean;
     qualifiedCreationDevice?: boolean;
   };
-  checks?: CheckV5[];
+  checks?: CheckV6[];
   issueIds?: string[];
   remediationIds?: string[];
 }
 
-export interface CertificateV5 {
+export interface CertificateV6 {
   certificateId: string;
   role?: CertificateRole;
   source?: CertificateSource;
@@ -578,7 +632,7 @@ export interface CertificateV5 {
   } | null;
 }
 
-export interface RevocationEvidenceV5 {
+export interface RevocationEvidenceV6 {
   evidenceId: string;
   type?: string;
   source?: string;
@@ -589,7 +643,7 @@ export interface RevocationEvidenceV5 {
   status?: string;
 }
 
-export interface IssueV5 {
+export interface IssueV6 {
   issueId: string;
   severity?: IssueSeverity;
   code: string;
@@ -605,7 +659,7 @@ export interface IssueV5 {
   fileNeedsResigning?: boolean;
 }
 
-export interface RemediationV5 {
+export interface RemediationV6 {
   remediationId: string;
   priority: number;
   stage?: RemediationStage;
@@ -614,30 +668,33 @@ export interface RemediationV5 {
   description?: string;
   resolvesIssueIds?: string[];
   requiresResigning?: boolean;
-  requiresNetwork?: boolean;
+  /** Đổi tên + đổi hình dạng ở 6.0.0: trước là `requiresNetwork` (boolean). */
+  networkRequirement?: NetworkRequirement | null;
 }
 
-export interface ReportDataV5 {
-  document: DocumentInfoV5;
-  validationContext?: ValidationContextV5;
-  summary: SummaryV5;
-  revisions?: RevisionV5[];
-  signatures?: SignatureV5[];
-  certificates?: CertificateV5[];
-  revocationEvidence?: RevocationEvidenceV5[];
-  issues?: IssueV5[];
-  remediations?: RemediationV5[];
+export interface ReportDataV6 {
+  document: DocumentInfoV6;
+  validationContext?: ValidationContextV6;
+  summary: SummaryV6;
+  revisions?: RevisionV6[];
+  signatures?: SignatureV6[];
+  certificates?: CertificateV6[];
+  revocationEvidence?: RevocationEvidenceV6[];
+  issues?: IssueV6[];
+  remediations?: RemediationV6[];
 }
 
-export interface VerificationReportV5 {
+export interface VerificationReportV6 {
   schemaVersion: string;
   run: {
     runId: string;
+    /** Mới ở 6.0.0 — cùng giá trị với header `X-Correlation-Id`, giữ được khi báo cáo rời khỏi response. */
+    correlationId?: string | null;
     verifiedAt: string;
     durationMs?: number;
     engine: { name: string; version: string; build?: string | null };
   };
-  data: ReportDataV5;
+  data: ReportDataV6;
 }
 
 /* ------------------------------------------------------------------ *
@@ -690,7 +747,8 @@ export interface VerificationRemediation {
   description?: string | null;
   resolvesIssueIds: string[];
   requiresResigning: boolean;
-  requiresNetwork: boolean;
+  /** Đổi tên + đổi hình dạng ở 6.0.0: trước là `requiresNetwork` (boolean). */
+  networkRequirement: NetworkRequirement;
 }
 
 export interface SignatureCheck {
@@ -726,7 +784,7 @@ export interface ChainNode {
   selfSigned: boolean;
   policyOids?: string[] | null;
   /** Kết luận của engine cho chính chứng thư này — tách khỏi trạng thái hiệu lực. */
-  validation?: CertificateV5["validation"];
+  validation?: CertificateV6["validation"];
 }
 
 export interface CertificateChain {
@@ -762,7 +820,7 @@ export interface CertificateRevocation {
   blockedByCheckIds: string[];
   onlineLookupAttempted: boolean;
   revocationTime?: string | null;
-  evidence: RevocationEvidenceV5[];
+  evidence: RevocationEvidenceV6[];
 }
 
 export interface SignatureRevocation {
@@ -816,7 +874,7 @@ export interface VerificationSignature {
   baselineLevel?: string | null;
   achievedBaselineLevel?: string | null;
   missingForNextLevel: string[];
-  relation?: SignatureV5["relation"] | null;
+  relation?: SignatureV6["relation"] | null;
   signingTime?: string | null;
   /** Thời điểm ký chỉ đáng tin khi có timestamp neo được — đừng hiện nó như sự thật. */
   signingTimeTrusted: boolean;
@@ -837,8 +895,8 @@ export interface VerificationSignature {
   timestamps: VerificationTimestamp[];
   references: SignatureReference[];
   scope?: SignatureScope | null;
-  longTermValidation?: SignatureV5["longTermValidation"] | null;
-  modificationsAfterSigning?: ModificationsAfterSigningV5 | null;
+  longTermValidation?: SignatureV6["longTermValidation"] | null;
+  modificationsAfterSigning?: ModificationsAfterSigningV6 | null;
   checks: SignatureCheck[];
   issues: VerificationIssue[];
   remediations: VerificationRemediation[];
@@ -871,8 +929,8 @@ export interface ValidationPolicy {
 }
 
 export interface TrustDomain {
-  signer?: TrustDomainRefV5 | null;
-  tsa?: TrustDomainRefV5 | null;
+  signer?: TrustDomainRefV6 | null;
+  tsa?: TrustDomainRefV6 | null;
 }
 
 export interface VerificationReport {
@@ -887,15 +945,15 @@ export interface VerificationReport {
   fileSize: number;
   sha256: string;
   signatureStatistics: SignatureStatistics;
-  documentState?: SummaryV5["documentState"];
+  documentState?: SummaryV6["documentState"];
   verifiedAt: string;
   durationMs?: number | null;
   runId: string;
   engine: VerificationEngine;
   policy?: ValidationPolicy | null;
   trustDomain: TrustDomain;
-  network?: ValidationContextV5["network"] | null;
-  referenceTime?: ValidationContextV5["referenceTime"];
+  network?: ValidationContextV6["network"] | null;
+  referenceTime?: ValidationContextV6["referenceTime"];
   signatures: VerificationSignature[];
   /** Toàn bộ vấn đề, phẳng. Màn tổng quan dùng `rootIssues`. */
   issues: VerificationIssue[];
@@ -903,7 +961,7 @@ export interface VerificationReport {
   rootIssues: VerificationIssue[];
   /** Đã gộp theo `actionCode` và sắp sẵn theo `priority`. */
   remediations: VerificationRemediation[];
-  revisions: RevisionV5[];
+  revisions: RevisionV6[];
 }
 
 /* ------------------------------------------------------------------ *
@@ -913,12 +971,12 @@ export interface VerificationReport {
 /**
  * Schema major mà bàn thử này đọc được.
  *
- * Chỉ so major: minor/patch của schema 5 được cam kết backward-compatible (chỉ
- * thêm field), nên khoá chặt `=== "5.0.0"` sẽ làm giao diện vỡ vô cớ ở `5.1.0`.
+ * Chỉ so major: minor/patch của schema 6 được cam kết backward-compatible (chỉ
+ * thêm field), nên khoá chặt `=== "6.0.0"` sẽ làm giao diện vỡ vô cớ ở `6.1.0`.
  * KHÔNG gate bằng `run.engine.version` — đó là version của engine, không phải của
  * hợp đồng JSON.
  */
-export const SUPPORTED_SCHEMA_MAJOR = 5;
+export const SUPPORTED_SCHEMA_MAJOR = 6;
 
 export function checkSchemaVersionCompatible(schemaVersion: string): void {
   const [major] = String(schemaVersion ?? "").split(".").map(Number);
@@ -939,8 +997,8 @@ function statusOf(main: MainIndication): VerificationStatus {
   return MAIN_TO_STATUS[main] ?? "INDETERMINATE";
 }
 
-/** Mọi thứ trong schema 5 tham chiếu nhau bằng ID — dựng map một lần thay vì tìm tuyến tính. */
-function indexReport(data: ReportDataV5) {
+/** Mọi thứ trong schema 6 tham chiếu nhau bằng ID — dựng map một lần thay vì tìm tuyến tính. */
+function indexReport(data: ReportDataV6) {
   return {
     certById: new Map((data.certificates ?? []).map((c) => [c.certificateId, c])),
     issueById: new Map((data.issues ?? []).map((i) => [i.issueId, i])),
@@ -951,7 +1009,7 @@ function indexReport(data: ReportDataV5) {
 
 type ReportIndex = ReturnType<typeof indexReport>;
 
-function adaptIssue(issue: IssueV5): VerificationIssue {
+function adaptIssue(issue: IssueV6): VerificationIssue {
   return {
     issueId: issue.issueId,
     severity: issue.severity ?? "INFO",
@@ -971,7 +1029,7 @@ function adaptIssue(issue: IssueV5): VerificationIssue {
   };
 }
 
-function adaptRemediation(remediation: RemediationV5): VerificationRemediation {
+function adaptRemediation(remediation: RemediationV6): VerificationRemediation {
   return {
     remediationId: remediation.remediationId,
     priority: remediation.priority,
@@ -981,14 +1039,14 @@ function adaptRemediation(remediation: RemediationV5): VerificationRemediation {
     description: remediation.description ?? null,
     resolvesIssueIds: remediation.resolvesIssueIds ?? [],
     requiresResigning: remediation.requiresResigning ?? false,
-    requiresNetwork: remediation.requiresNetwork ?? false,
+    networkRequirement: remediation.networkRequirement ?? "NOT_REQUIRED",
   };
 }
 
 function resolveIssues(ids: string[] | undefined, index: ReportIndex): VerificationIssue[] {
   return (ids ?? [])
     .map((id) => index.issueById.get(id))
-    .filter((issue): issue is IssueV5 => Boolean(issue))
+    .filter((issue): issue is IssueV6 => Boolean(issue))
     .map(adaptIssue);
 }
 
@@ -998,7 +1056,7 @@ function resolveIssues(ids: string[] | undefined, index: ReportIndex): Verificat
  * `validity.status` chỉ nói PASS/FAIL, không nói *vì sao* — nên khi không PASS thì
  * đối chiếu mốc thời gian để phân biệt hết hạn với chưa tới hạn.
  */
-function chainNodeStatus(validity: CertificateV5["validity"]): ChainNodeStatus {
+function chainNodeStatus(validity: CertificateV6["validity"]): ChainNodeStatus {
   if (!validity) return "UNKNOWN";
   if (validity.status === "PASS") return "VALID";
 
@@ -1013,7 +1071,7 @@ function chainNodeStatus(validity: CertificateV5["validity"]): ChainNodeStatus {
   return validity.status === "FAIL" ? "INVALID" : "UNKNOWN";
 }
 
-function toChainNode(cert: CertificateV5, position: number): ChainNode {
+function toChainNode(cert: CertificateV6, position: number): ChainNode {
   const subjectDn = cert.subject?.dn ?? "";
   const issuerDn = cert.issuer?.dn ?? "";
 
@@ -1047,13 +1105,13 @@ function toChainNode(cert: CertificateV5, position: number): ChainNode {
 }
 
 function toChain(
-  path: CandidatePathV5,
+  path: CandidatePathV6,
   trustStatus: CheckOutcome,
   index: ReportIndex,
 ): CertificateChain {
   const nodes = (path.certificateIds ?? [])
     .map((id) => index.certById.get(id))
-    .filter((cert): cert is CertificateV5 => Boolean(cert))
+    .filter((cert): cert is CertificateV6 => Boolean(cert))
     .map(toChainNode);
 
   const anchor = path.completeToKnownTrustAnchor ? nodes[nodes.length - 1] : undefined;
@@ -1077,7 +1135,7 @@ function toChain(
  * chuỗi vẫn có gì đó xem — thà hiện chứng thư đơn lẻ còn hơn một khung trống.
  */
 function adaptCertificateChains(
-  signature: SignatureV5,
+  signature: SignatureV6,
   index: ReportIndex,
 ): { selected: CertificateChain | null; candidates: CertificateChain[] } {
   const cv = signature.certificateValidation;
@@ -1106,7 +1164,7 @@ function adaptCertificateChains(
 }
 
 function adaptTimestamp(
-  timestamp: TimestampV5,
+  timestamp: TimestampV6,
   index: ReportIndex,
 ): VerificationTimestamp {
   const tsaCert = timestamp.tsaCertificateId
@@ -1150,7 +1208,7 @@ function adaptTimestamp(
   };
 }
 
-function formatAccuracy(accuracy: TimestampV5["accuracy"]): string | null {
+function formatAccuracy(accuracy: TimestampV6["accuracy"]): string | null {
   if (!accuracy) return null;
   const parts: string[] = [];
   if (accuracy.seconds) parts.push(`${accuracy.seconds}s`);
@@ -1160,7 +1218,7 @@ function formatAccuracy(accuracy: TimestampV5["accuracy"]): string | null {
 }
 
 function adaptRevocation(
-  signature: SignatureV5,
+  signature: SignatureV6,
   index: ReportIndex,
 ): SignatureRevocation | null {
   const revocation = signature.revocation;
@@ -1183,7 +1241,7 @@ function adaptRevocation(
         revocationTime: result.revocationTime ?? null,
         evidence: (result.embeddedEvidenceIds ?? [])
           .map((id) => index.evidenceById.get(id))
-          .filter((evidence): evidence is RevocationEvidenceV5 => Boolean(evidence)),
+          .filter((evidence): evidence is RevocationEvidenceV6 => Boolean(evidence)),
       };
     }),
   };
@@ -1193,7 +1251,7 @@ function adaptRevocation(
  * Manifest tham chiếu. PDF dùng `byteRange` nên nhánh này rỗng; XML/OOXML dùng
  * `references[]`. Rẽ theo `scope.type`, đừng đoán từ `document.format`.
  */
-function adaptReferences(scope: ScopeV5 | undefined): SignatureReference[] {
+function adaptReferences(scope: ScopeV6 | undefined): SignatureReference[] {
   return (scope?.references ?? []).map((reference, i) => ({
     index: i,
     uri: reference.uri ?? "",
@@ -1206,7 +1264,7 @@ function adaptReferences(scope: ScopeV5 | undefined): SignatureReference[] {
   }));
 }
 
-function adaptSignature(signature: SignatureV5, index: ReportIndex): VerificationSignature {
+function adaptSignature(signature: SignatureV6, index: ReportIndex): VerificationSignature {
   const { selected, candidates } = adaptCertificateChains(signature, index);
   const crypto = signature.cryptography;
   const signerCertId =
@@ -1215,10 +1273,10 @@ function adaptSignature(signature: SignatureV5, index: ReportIndex): Verificatio
   const signerCert = signerCertId ? index.certById.get(signerCertId) : undefined;
   const timestamps = (signature.timestamps ?? []).map((ts) => adaptTimestamp(ts, index));
 
-  const displayName =
-    signature.signerIdentity?.displayName ??
-    signerCert?.subject?.commonName ??
-    signature.claimedProperties?.signerName;
+  // `claimedProperties.pdfSignerName` là lời khai của PDF (`/Name` trong dictionary
+  // chữ ký), KHÔNG được mật mã bảo vệ — schema 6 tách hẳn nó khỏi danh tính đã xác
+  // thực để không ai lỡ hiển thị một cái tên tự khai như thể đã được xác minh.
+  const displayName = signature.signerIdentity?.displayName ?? signerCert?.subject?.commonName;
   const distinguishedName =
     signature.signerIdentity?.distinguishedName ?? signerCert?.subject?.dn ?? "";
 
@@ -1306,7 +1364,7 @@ function adaptSignature(signature: SignatureV5, index: ReportIndex): Verificatio
     issues: resolveIssues(signature.issueIds, index),
     remediations: (signature.remediationIds ?? [])
       .map((id) => index.remedById.get(id))
-      .filter((remediation): remediation is RemediationV5 => Boolean(remediation))
+      .filter((remediation): remediation is RemediationV6 => Boolean(remediation))
       .map(adaptRemediation),
   };
 }
@@ -1320,7 +1378,7 @@ function normalizeStandard(standard: string | undefined): RealSignatureStandard 
  * Loại tệp để hiển thị. `detectedType` chỉ nói tới mức "OOXML"; đuôi tệp khai báo
  * là thứ duy nhất phân biệt được DOCX với XLSX, nên ưu tiên nó ở nhánh đó.
  */
-function contentTypeOf(document: DocumentInfoV5): VerificationContentType {
+function contentTypeOf(document: DocumentInfoV6): VerificationContentType {
   const detected = document.format?.detectedType;
   const extension = document.format?.declaredExtension?.replace(/^\./, "").toUpperCase();
 
@@ -1331,14 +1389,14 @@ function contentTypeOf(document: DocumentInfoV5): VerificationContentType {
   return detected ?? "UNKNOWN";
 }
 
-function primaryHash(document: DocumentInfoV5): string {
+function primaryHash(document: DocumentInfoV6): string {
   const hashes = document.hashes ?? [];
   const sha256 = hashes.find((hash) => hash.algorithm?.toUpperCase().replace("-", "") === "SHA256");
   return sha256?.value ?? hashes[0]?.value ?? "";
 }
 
-/** Chuyển báo cáo schema 5.x thành view model. */
-export function adaptV5ReportToView(report: VerificationReportV5): VerificationReport {
+/** Chuyển báo cáo schema 6.x thành view model. */
+export function adaptV6ReportToView(report: VerificationReportV6): VerificationReport {
   checkSchemaVersionCompatible(report?.schemaVersion);
 
   const data = report.data;
@@ -1352,7 +1410,7 @@ export function adaptV5ReportToView(report: VerificationReportV5): VerificationR
   // Backend đã đếm sẵn. Đếm lại từ danh sách chỉ khi khối thống kê khuyết — và khi
   // đó vẫn phải giữ `cryptographicallyValid` tách khỏi `totalPassed`.
   const stats = summary.signatureStatistics ?? {
-    detected: inventory?.detected ?? signatures.length,
+    detected: inventory?.signaturesDetected ?? signatures.length,
     processed: inventory?.processed ?? signatures.length,
     cryptographicallyValid: signatures.filter(
       (s) => s.validation.cryptographicIntegrity === "PASS",
@@ -1360,14 +1418,14 @@ export function adaptV5ReportToView(report: VerificationReportV5): VerificationR
     totalPassed: signatures.filter((s) => s.mainIndication === "TOTAL_PASSED").length,
     totalFailed: signatures.filter((s) => s.mainIndication === "TOTAL_FAILED").length,
     indeterminate: signatures.filter((s) => s.mainIndication === "INDETERMINATE").length,
-    notProcessed: Math.max(0, (inventory?.detected ?? 0) - (inventory?.processed ?? 0)),
+    notProcessed: Math.max(0, (inventory?.signaturesDetected ?? 0) - (inventory?.processed ?? 0)),
   };
 
   // `rootIssueIds` đã lọc bỏ INFO ở backend; lọc lại ở đây để một bản minor thêm
   // mã mới không làm màn tổng quan đầy tiếng ồn.
   const rootIssues = (summary.rootIssueIds ?? [])
     .map((id) => index.issueById.get(id))
-    .filter((issue): issue is IssueV5 => Boolean(issue) && issue!.severity !== "INFO")
+    .filter((issue): issue is IssueV6 => Boolean(issue) && issue!.severity !== "INFO")
     .map(adaptIssue);
 
   return {
