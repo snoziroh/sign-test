@@ -12,8 +12,8 @@ export async function generateMetadata(): Promise<Metadata> {
 /**
  * Màn tạo yêu cầu ký nhiều bước.
  *
- * Khác hai màn kia ở một điểm nền tảng: nó KHÔNG gọi dịch vụ ký. Màn `/` ký ngay
- * tại chỗ, màn `/verify` thẩm định ngay tại chỗ; màn này soạn ra một quy trình
+ * Khác hai màn kia ở một điểm nền tảng: nó KHÔNG gọi dịch vụ ký. Màn `/sign` ký
+ * ngay tại chỗ, màn `/verify` thẩm định ngay tại chỗ; màn này soạn ra một quy trình
  * cho người khác chạy về sau. Cả luồng hiện sống trong state của trang — bản
  * dựng giao diện, chưa có endpoint nào phía sau.
  *

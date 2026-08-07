@@ -98,8 +98,14 @@ export const SIGNING_ERROR_MESSAGES: Record<string, string> = {
   /* FPT eSign Cloud */
   FPT_ENROLLMENT_REQUIRED:
     "Chưa có agreementUuid nên phải điền đầy đủ thông tin đăng ký chứng thư.",
+  /**
+   * Màn hình KHÔNG còn ô nhập tên người ký — tên trên chữ ký phải là tên trong
+   * chứng thư do CA cấp, không phải chuỗi người dùng tự gõ. Gặp mã này nghĩa là
+   * dịch vụ ký vẫn đang bắt client gửi tên; phải sửa ở đó, người dùng không có
+   * gì để điền thêm.
+   */
   FPT_SIGNER_DISPLAY_NAME_REQUIRED:
-    "eSign Cloud bắt buộc có tên người ký: chứng thư chỉ được cấp sau khi nhập OTP nên chưa có CN để lấy tên.",
+    "Dịch vụ ký đang đòi tên người ký do client gửi lên. Màn hình này không gửi tên tự nhập nữa — tên phải lấy từ hồ sơ đăng ký / chứng thư của CA. Cần cập nhật dịch vụ ký.",
   REMOTE_IDENTITY_NOT_CONFIRMED:
     "Người ký chưa xác nhận xong thông tin trên trang của CA. Mở lại đường dẫn, hoàn tất rồi bấm Tiếp tục.",
   FPT_PREPARE_HASH_SIGNING_REJECTED: "CA từ chối mở giao dịch ký.",

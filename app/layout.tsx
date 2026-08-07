@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { IBM_Plex_Sans, IBM_Plex_Mono } from "next/font/google";
 import { ThemeProvider } from "@/components/theme/theme-provider";
 import { LocaleProvider } from "@/components/i18n/locale-provider";
+import { AppNavbar } from "@/components/shell/app-navbar";
 import { getLocale } from "@/lib/i18n/server";
 import { ToastProvider } from "@/components/ui/toast";
 import "./globals.css";
@@ -40,7 +41,10 @@ export default async function RootLayout({
       <body className="flex min-h-full flex-col">
         <LocaleProvider initialLocale={locale}>
           <ThemeProvider>
-            <ToastProvider>{children}</ToastProvider>
+            <ToastProvider>
+              <AppNavbar />
+              <main className="flex-1">{children}</main>
+            </ToastProvider>
           </ThemeProvider>
         </LocaleProvider>
       </body>

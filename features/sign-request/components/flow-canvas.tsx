@@ -9,7 +9,6 @@ import {
   ClockIcon,
   GripVerticalIcon,
   LinkIcon,
-  PenLineIcon,
   PlusIcon,
   TrashIcon,
   UserPlusIcon,
@@ -310,14 +309,14 @@ function StepLane({
           <h3 className="flex-1 text-[13.5px] font-semibold text-fg">{title}</h3>
         )}
 
-        <span
+        {/* <span
           className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${
             counterSign ? "bg-inset text-fg-muted" : "bg-accent-subtle text-accent"
           }`}
         >
           <PenLineIcon size={12} />
           {counterSign ? c.counterSign : c.coSign}
-        </span>
+        </span> */}
 
         {progressState ? (
           <span
@@ -691,7 +690,7 @@ function StepConnector({ t, muted = false }: { t: Dictionary; muted?: boolean })
   return (
     <div aria-hidden="true" className="flex items-center gap-2 py-1.5 pl-6">
       <span className={`h-6 w-0.5 rounded-full ${muted ? "bg-border-muted" : "bg-border"}`} />
-      <span className="font-mono text-[10px] uppercase tracking-[0.1em] text-fg-subtle">
+      <span className="font-mono text-[10px] uppercase tracking-widest text-fg-subtle">
         {t.signRequest.flow.canvas.thenLabel}
       </span>
     </div>
@@ -716,7 +715,7 @@ function RuleToggle({
     <div
       role="group"
       aria-label={c.ruleLabel}
-      className="mr-1 inline-flex gap-0.5 rounded-md bg-inset p-[2px]"
+      className="mr-1 inline-flex gap-0.5 rounded-md bg-inset p-0.5"
     >
       {(["ALL", "ANY"] as const).map((value) => (
         <button

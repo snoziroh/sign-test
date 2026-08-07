@@ -34,14 +34,20 @@ import { agentCanSign } from "../usb-token-source";
  *
  * Năm chặng, và chặng nào cũng có thể là chặng cuối nếu hỏng:
  *
- * 1. `PREPARING` — nộp PDF, backend trả `jobId` + digest. Job sống 15 phút.
- * 2. `CONNECTING_AGENT` — `/GetToken` rồi `/GetListCertificate` tới
+ * 1. `CONNECTING_AGENT` — `/GetToken` rồi `/GetListCertificate` tới
  *    `localhost:14211`. Đây là chặng hay hỏng nhất: agent chưa chạy.
- * 3. `SELECTING_CERTIFICATE` — người ký chọn danh tính. KHÔNG tự ký kể cả khi
+ * 2. `SELECTING_CERTIFICATE` — người ký chọn danh tính. KHÔNG tự ký kể cả khi
  *    chỉ có một chứng thư: chọn nhầm là ký nhầm một danh tính pháp lý.
+ * 3. `PREPARING` — nộp PDF, backend trả `jobId` + digest. Job sống 15 phút.
  * 4. `WAITING_FOR_PIN` — `/SignHash`. Cửa sổ PIN của FPT-CA bật ra Ở NGOÀI trình
  *    duyệt; lời gọi treo tới khi người ký xong việc ở đó.
  * 5. `COMPLETING` — nộp chữ ký + chứng thư, backend dựng CMS và verify lại PDF.
+ *
+ * Vì sao chọn chứng thư đứng TRƯỚC lúc tạo job — thứ tự này không phải tuỳ ý:
+ * tên hiện trên chữ ký phải là tên đã được CA chứng nhận, tức CN của chứng thư
+ * đang cắm trong token, chứ không phải một chuỗi người dùng tự gõ. Mà khung chữ
+ * ký được vẽ vào PDF ngay lúc tạo job (digest tính trên PDF đã có khung đó), nên
+ * cái tên phải biết TRƯỚC lời gọi ấy — chỉ có một cách: chọn chứng thư trước.
  *
  * Hộp thoại KHÔNG tự chạy lại bất cứ chặng nào. Job dùng một lần, nên "thử lại"
  * luôn là làm lại từ đầu: job mới, và một lần nhập PIN nữa.
@@ -59,7 +65,11 @@ interface UsbTokenSignDialogProps {
   fileName?: string;
   sourceName: string;
   file: File;
-  request: UsbTokenJobRequest;
+  /**
+   * Thiếu `signerDisplayName` — CỐ Ý. Hộp thoại điền nó bằng CN của chứng thư
+   * người ký vừa chọn; màn hình cấu hình không có ô nào cho tên người ký nữa.
+   */
+  request: Omit<UsbTokenJobRequest, "signerDisplayName">;
   /** Nhãn thuật toán của backend — xem `signature-algorithm.ts`. */
   catalog?: AlgorithmCatalog;
   onCompleted: (response: SignResponse) => void;
@@ -79,8 +89,16 @@ export function UsbTokenSignDialog({
   const u = t.sign.usbToken;
   const s = t.sign.session;
 
-  const [phase, setPhase] = useState<UsbTokenPhase>("PREPARING");
-  const [job, setJob] = useState<UsbTokenJob>();
+  const [phase, setPhase] = useState<UsbTokenPhase>("CONNECTING_AGENT");
+  /**
+   * Job đã tạo, kèm thumbprint của chứng thư nó được dựng cho.
+   *
+   * Cặp đôi chứ không phải mình cái job: khung chữ ký trong PDF mang tên của
+   * đúng chứng thư đó. Ký hỏng rồi đổi sang chứng thư khác mà dùng lại job cũ là
+   * ký một tài liệu ghi tên người khác — nên job chỉ được dùng lại khi thumbprint
+   * còn khớp.
+   */
+  const [job, setJob] = useState<{ value: UsbTokenJob; thumbprint: string }>();
   const [certificates, setCertificates] = useState<FptCertificate[]>([]);
   /**
    * Chứng thư ĐANG HIỆN trong băng chuyền — và cũng chính là chứng thư sẽ được
@@ -133,18 +151,61 @@ export function UsbTokenSignDialog({
     const controller = new AbortController();
     let cancelled = false;
 
-    async function prepare() {
+    async function connect() {
       setError(undefined);
       setCertificates([]);
       setCertificateIndex(0);
       setJob(undefined);
       agentTokenRef.current = undefined;
-      setPhase("PREPARING");
+      setPhase("CONNECTING_AGENT");
 
       try {
-        const prepared = await createUsbTokenJob(file, request, controller.signal);
+        const agentToken = await getAgentToken(controller.signal);
         if (cancelled) return;
-        setJob(prepared);
+        agentTokenRef.current = agentToken;
+
+        const list = await listAgentCertificates(agentToken, controller.signal);
+        if (cancelled) return;
+
+        setCertificates(list);
+        setCertificateIndex(0);
+        setPhase("SELECTING_CERTIFICATE");
+      } catch (cause) {
+        if (cancelled || (cause instanceof DOMException && cause.name === "AbortError")) return;
+        setError(describe(cause));
+      }
+    }
+
+    void connect();
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, [attempt, describe]);
+
+  /* Chặng 3 → 5: chỉ chạy khi người ký bấm. */
+  async function signWithCertificate() {
+    const agentToken = agentTokenRef.current;
+    const certificate = certificates[certificateIndex];
+    if (!agentToken || !certificate) return;
+
+    setError(undefined);
+    try {
+      /*
+        Tên người ký lấy THẲNG từ chứng thư: CN, và chỉ khi CN rỗng mới rơi về
+        subject DN. Không có đường nào khác đưa tên vào đây — màn hình cấu hình
+        không còn ô nhập, nên chữ ký không thể mang một tên không được CA chứng
+        nhận.
+      */
+      let prepared = job?.thumbprint === certificate.thumbprint ? job.value : undefined;
+
+      if (!prepared) {
+        setPhase("PREPARING");
+        prepared = await createUsbTokenJob(file, {
+          ...request,
+          signerDisplayName: certificate.commonName?.trim() || certificate.subjectDN,
+        });
+        setJob({ value: prepared, thumbprint: certificate.thumbprint });
 
         /*
           Backend đã CHỐT thuật toán cho job này. Nếu nó không phải PKCS#1 thì
@@ -162,60 +223,26 @@ export function UsbTokenSignDialog({
             message: u.errorSchemeUnsupported(algorithmLabel(chosen, catalog)),
             code: "USB_TOKEN_AGENT_SCHEME_UNSUPPORTED",
           });
+          setPhase("SELECTING_CERTIFICATE");
           return;
         }
-
-        setPhase("CONNECTING_AGENT");
-        const agentToken = await getAgentToken(controller.signal);
-        if (cancelled) return;
-        agentTokenRef.current = agentToken;
-
-        const list = await listAgentCertificates(agentToken, controller.signal);
-        if (cancelled) return;
-
-        setCertificates(list);
-        setCertificateIndex(0);
-        setPhase("SELECTING_CERTIFICATE");
-      } catch (cause) {
-        if (cancelled || (cause instanceof DOMException && cause.name === "AbortError")) return;
-        setError(describe(cause));
       }
-    }
 
-    void prepare();
-    return () => {
-      cancelled = true;
-      controller.abort();
-    };
-    // `request` và `catalog` được dựng lại mỗi lần render của cha nên KHÔNG đưa
-    // vào deps — chúng sẽ tạo job mới vô hạn. Cha chốt payload lúc mở hộp thoại,
-    // và catalog chỉ đọc nhãn nên đọc bản cũ cũng không sai.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [attempt, file, describe]);
-
-  /* Chặng 3 → 5: chỉ chạy khi người ký bấm. */
-  async function signWithCertificate() {
-    const agentToken = agentTokenRef.current;
-    const certificate = certificates[certificateIndex];
-    if (!job || !agentToken || !certificate) return;
-
-    setError(undefined);
-    setPhase("WAITING_FOR_PIN");
-    try {
+      setPhase("WAITING_FOR_PIN");
       const signature = await signHash({
         token: agentToken,
-        digestBase64: job.digestBase64,
+        digestBase64: prepared.digestBase64,
         // Đúng chuỗi backend trả về (SHA256 / SHA384 / SHA512) — không còn giả
         // định SHA-256, và không suy lại từ độ dài digest.
-        digestAlgorithm: job.digestAlgorithm,
+        digestAlgorithm: prepared.digestAlgorithm,
         // Nguyên văn serial agent trả về — chuẩn hoá là agent không tìm ra khoá.
         serialNumber: certificate.serialNumber,
         // Agent 1.3.1 chưa có chỗ nhận — xem `signHash()`.
-        jcaSignatureAlgorithm: job.jcaSignatureAlgorithm,
+        jcaSignatureAlgorithm: prepared.jcaSignatureAlgorithm,
       });
 
       setPhase("COMPLETING");
-      const response = await completeUsbTokenJob(job.jobId, {
+      const response = await completeUsbTokenJob(prepared.jobId, {
         signatureBase64: signature,
         certificateBase64: certificate.base64Encode,
       });
@@ -228,7 +255,7 @@ export function UsbTokenSignDialog({
     }
   }
 
-  const remaining = useCountdown(job?.expiresAt);
+  const remaining = useCountdown(job?.value.expiresAt);
   const busy =
     phase === "PREPARING" ||
     phase === "CONNECTING_AGENT" ||
@@ -273,9 +300,9 @@ export function UsbTokenSignDialog({
           bằng cái người dùng chọn ở form: bỏ trống `algorithm` là backend tự
           lấy mặc định của nó, và mặc định đó nay là PSS chứ không phải PKCS#1.
         */}
-        {job?.signatureAlgorithm ? (
+        {job?.value.signatureAlgorithm ? (
           <p className="text-center text-[10.5px] text-fg-muted">
-            {u.jobAlgorithm(algorithmLabel(job.signatureAlgorithm, catalog))}
+            {u.jobAlgorithm(algorithmLabel(job.value.signatureAlgorithm, catalog))}
           </p>
         ) : null}
 

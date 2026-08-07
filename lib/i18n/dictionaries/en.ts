@@ -21,6 +21,11 @@ export const en = {
   },
 
   routes: {
+    home: {
+      label: "Home",
+      title: "FIS CA Signing Tool",
+      description: "Pick a workspace — signing, signing requests, or verification",
+    },
     login: {
       label: "Login",
       title: "Login to Sigil System",
@@ -98,6 +103,8 @@ export const en = {
     openMenu: "Open navigation menu",
     closeMenu: "Close navigation menu",
     navigationTitle: "Navigation",
+    backToHome: "Home",
+    open: "Open",
   },
 
   shell: {
@@ -367,7 +374,7 @@ export const en = {
       summaryUnset: "—",
       restart: "Start over",
       restartHint:
-        "Clears the document, the key material and every choice — the page returns to the state it had when you opened it. Download the signed file first: it only exists on this page.",
+        "Clears the document, the key material and every choice — the page returns to the state it had when you opened it. The agreementUuid goes with it, so the next eSign Cloud signing has to enroll again: a new transaction at FPT. Download the signed file first: it only exists on this page.",
     },
     document: {
       sectionTitle: "Document",
@@ -462,7 +469,9 @@ export const en = {
       profile: "Profile",
       inMemoryNote:
         "The signed file only exists in this page: the response carries it as base64 and there is no endpoint to fetch it again. Download it before leaving.",
-      signAgainOnResult: "Sign again on this result",
+      signAgainSameSignature: "Sign again with this signature",
+      signAgainHint:
+        "Signing again keeps this signature configuration and rolls the preview back to the unsigned document — the result above is discarded. Download it first if you need it.",
       download: "Download signed file",
     },
     source: {
@@ -510,14 +519,14 @@ export const en = {
     },
     esign: {
       title: "FPT eSign Cloud (OTP)",
-      signerNameLabel: "Signer display name",
-      signerNamePlaceholder: "Nguyễn Văn A",
-      signerNameHint:
-        "Required here only: the certificate is issued after the OTP, so there is no CN to read the name from yet.",
+      signerNameNote:
+        "The name on the signature comes from the certificate the CA issues for this enrollment. This screen never asks for it.",
       agreementLabel: "agreementUuid",
-      agreementPlaceholder: "Empty on the first signing",
+      agreementIssued: "Issued by the enrollment request",
+      agreementEmpty:
+        "Nothing yet. The CA issues this identifier in the response to the enrollment below — it cannot be typed in.",
       agreementHint:
-        "The signer's identity on the CA. Reuse it for every later signing — each enrollment is a new transaction at FPT. Kept in this browser.",
+        "The signer's identity on the CA, read straight from the enrollment response and never entered by hand. It lives only for this signing — nothing is kept in the browser, so starting over means enrolling again, which is a new transaction at FPT.",
       forget: "Forget",
       agreementReady: "Identity confirmed — the certificate is ready",
       agreementRecreate: "Create a new agreement",
@@ -579,10 +588,8 @@ export const en = {
     },
     usbToken: {
       title: "FPT USB Token",
-      signerNameLabel: "Signer display name",
-      signerNamePlaceholder: "Nguyễn Văn A",
-      signerNameHint:
-        "Required here: the PDF is built before the certificate is chosen, so there is no CN to read the name from yet.",
+      signerNameNote:
+        "The name on the signature comes from the CN of the certificate picked in the token, never from this screen.",
       checkAgent: "Test the Signing Agent",
       agentChecking: "Testing…",
       agentReady: (count: number) =>
@@ -737,7 +744,6 @@ export const en = {
       p12PasswordRequired: "The key file password is required.",
       mpkiUsernameRequired: "Enter the signer's MPKI username.",
       mpkiCredentialRequired: "Choose which credential to sign with.",
-      signerDisplayNameRequired: "eSign Cloud requires a signer display name.",
       enrollmentRequired:
         "Without an agreementUuid, enrollment needs the full name, citizen ID, mobile number, email and both sides of the ID card.",
       agreementRequired:

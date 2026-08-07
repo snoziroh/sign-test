@@ -56,8 +56,9 @@ export const USB_TOKEN_SOURCE: SignatureSource = {
   visibleSignature: true,
   requiresUploadedKeyFile: false,
   requiresCredentialSelection: false,
-  // PDF được dựng TRƯỚC khi người dùng chọn chứng thư nên chưa có CN để lấy tên.
-  requiresSignerDisplayName: true,
+  // Màn hình không hỏi tên người ký: hộp thoại ký lấy CN của chứng thư trong
+  // token, và nó chọn chứng thư trước khi tạo job đúng để có cái tên đó.
+  requiresSignerDisplayName: false,
   requiresEnrollment: false,
   interactionModel: "LOCAL_AGENT",
   // Job hết hạn sau 15 phút — cùng mốc với đồng hồ đếm ngược trong hộp thoại ký.

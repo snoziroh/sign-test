@@ -89,9 +89,7 @@ import {
 import {
   clearAgreementUuid,
   clearSessionRecord,
-  loadAgreementUuid,
   loadSessionRecord,
-  saveAgreementUuid,
   saveSessionRecord,
   type SignSessionRecord,
 } from "../sign-record-store";
@@ -151,11 +149,16 @@ interface DialogState {
   begin: () => Promise<SignResponse>;
 }
 
-/** Payload được CHỐT lúc bấm ký — dựng lại mỗi render sẽ tạo job mới liên tục. */
+/**
+ * Payload được CHỐT lúc bấm ký — dựng lại mỗi render sẽ tạo job mới liên tục.
+ *
+ * Thiếu `signerDisplayName`: tên người ký là CN của chứng thư trong token, chỉ
+ * đọc được sau khi người ký chọn chứng thư trong hộp thoại — xem `UsbTokenSignDialog`.
+ */
 interface UsbTokenDialogState {
   source: SignatureSource;
   file: File;
-  request: UsbTokenJobRequest;
+  request: Omit<UsbTokenJobRequest, "signerDisplayName">;
 }
 
 export function SignDocumentWorkspace() {
@@ -281,12 +284,9 @@ export function SignDocumentWorkspace() {
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- đồng bộ từ localStorage khi mount
     setResume(loadSessionRecord());
-    const stored = loadAgreementUuid();
-    if (stored) {
-      setForm((current) =>
-        current && !current.agreementUuid ? { ...current, agreementUuid: stored } : current,
-      );
-    }
+    // `agreementUuid` không được khôi phục — nó không còn được lưu nữa. Lời gọi
+    // này chỉ dọn giá trị các bản trước để lại; xem `clearAgreementUuid`.
+    clearAgreementUuid();
     // Huỷ lệnh ký đang treo khi rời màn hình — đọc ref lúc unmount là cố ý.
     return () => abortRef.current?.abort();
   }, []);
@@ -371,13 +371,14 @@ export function SignDocumentWorkspace() {
    * Về đúng trạng thái của lần đầu mở trang: bỏ tài liệu, bỏ tệp khoá, và dựng
    * lại form từ mặc định của capability thay vì giữ lựa chọn cũ.
    *
-   * HAI thứ cố ý KHÔNG bị xoá, vì lúc mới vào trang chúng cũng không rỗng:
+   * KHÔNG chừa lại gì của lần ký vừa xong — kể cả `agreementUuid`, và kể cả khi
+   * điều đó buộc lần ký sau phải đăng ký chứng thư lại (thêm một giao dịch bên
+   * FPT). Đó là cái giá đã được chấp nhận để màn ký không mang thông tin của
+   * người ký này sang lượt của người ký khác.
    *
-   * - `capabilities` — vẫn là của đúng dịch vụ đang chọn. Gọi lại `/capabilities`
-   *   chỉ để nhận về cùng một câu trả lời là một vòng loading thừa.
-   * - `agreementUuid` trong localStorage — nó được nạp lại lúc mount, và đó là
-   *   thứ duy nhất giữ cho lần ký sau khỏi phải đăng ký lại một giao dịch có
-   *   tính phí ở FPT. Xoá nó ở đây là ném đi tiền của người dùng.
+   * Ngoại lệ duy nhất là `capabilities`: nó mô tả DỊCH VỤ chứ không mô tả lần ký
+   * nào, và gọi lại `/capabilities` chỉ để nhận đúng câu trả lời cũ là một vòng
+   * loading thừa.
    *
    * Tệp đã ký thì biến mất thật — nó chỉ sống trong bộ nhớ trang, nên dòng ghi
    * chú dưới nút nói rõ phải tải về trước.
@@ -405,14 +406,28 @@ export function SignDocumentWorkspace() {
     if (p12InputRef.current) p12InputRef.current.value = "";
 
     // Cùng trình tự với lúc mount: dựng form từ nguồn đầu tiên KHÔNG mang theo
-    // `previous`, rồi nhận lại agreementUuid đã lưu.
-    setForm(() => {
-      const preferred = capabilities?.sources[0];
-      if (!preferred) return undefined;
-      const next = resolveFormState(preferred, undefined, undefined);
-      const stored = loadAgreementUuid();
-      return stored ? { ...next, agreementUuid: stored } : next;
-    });
+    // `previous` — mọi lựa chọn, mật khẩu và hồ sơ đăng ký của lần trước rơi hết.
+    setForm(() =>
+      capabilities?.sources[0]
+        ? resolveFormState(capabilities.sources[0], undefined, undefined)
+        : undefined,
+    );
+  }
+
+  /**
+   * "Ký lại với chữ ký này": giữ nguyên cấu hình vừa ký, và quay về ĐÚNG bản
+   * chưa ký của tài liệu.
+   *
+   * `file` chưa bao giờ bị thay — bản đã ký chỉ nằm ở `signed`, và `previewFile`
+   * ưu tiên hiển thị nó. Nên rollback ở đây gọn đúng một việc: bỏ `signed` đi.
+   *
+   * Bỏ `signed` cũng là bỏ hẳn kết quả vừa ký: nó không tồn tại ở đâu ngoài bộ
+   * nhớ trang này. Hộp thoại nói rõ điều đó ngay cạnh nút.
+   */
+  function signAgainWithSameSignature() {
+    setSigned(undefined);
+    setFlow({ phase: "idle" });
+    setResultOpen(false);
   }
 
   function removeFile() {
@@ -718,11 +733,7 @@ export function SignDocumentWorkspace() {
         form={form}
         catalog={catalog}
         onClose={() => setResultOpen(false)}
-        onSignAgain={() => {
-          if (!signed) return;
-          setResultOpen(false);
-          void openDocument(signedDocumentAsFile(signed));
-        }}
+        onSignAgain={signAgainWithSameSignature}
       />
     </>
   );
@@ -925,9 +936,7 @@ function ConfigurationPanel(props: ConfigurationPanelProps) {
           {isPkcs12(source) ? <Pkcs12Card {...props} source={source} form={form} /> : null}
           {isMpki(source) ? <MpkiCard {...props} source={source} form={form} /> : null}
           {isSignCloud(source) ? <SignCloudCard {...props} source={source} form={form} /> : null}
-          {isUsbToken(source) ? (
-            <UsbTokenCard t={t} form={form} onUpdate={props.onUpdate} />
-          ) : null}
+          {isUsbToken(source) ? <UsbTokenCard t={t} /> : null}
         </>
       ) : null}
 
@@ -1359,20 +1368,12 @@ function credentialOptionLabel(credential: MpkiCredential): string {
 }
 
 /**
- * USB Token gần như không có gì để cấu hình trước: chứng thư nằm trong thiết bị
- * và chỉ đọc được khi bấm ký. Khối này vì thế chỉ có tên người ký (bắt buộc — PDF
- * được dựng trước khi biết chứng thư) và một nút thử kết nối agent, để tách
+ * USB Token không có gì để cấu hình trước: chứng thư nằm trong thiết bị và chỉ
+ * đọc được khi bấm ký — kể cả tên người ký, vốn là CN của chứng thư được chọn
+ * trong hộp thoại ký. Khối này vì thế chỉ còn một nút thử kết nối agent, để tách
  * "agent chưa chạy" ra khỏi "ký hỏng" TRƯỚC khi tạo job.
  */
-function UsbTokenCard({
-  t,
-  form,
-  onUpdate,
-}: {
-  t: Dictionary;
-  form: SignFormState;
-  onUpdate: <K extends keyof SignFormState>(key: K, value: SignFormState[K]) => void;
-}) {
+function UsbTokenCard({ t }: { t: Dictionary }) {
   const u = t.sign.usbToken;
   const [checking, setChecking] = useState(false);
   const [result, setResult] = useState<{ ok: boolean; message: string }>();
@@ -1409,17 +1410,6 @@ function UsbTokenCard({
   return (
     <ConfigCard title={u.title}>
       <div className="space-y-3">
-        <Field label={u.signerNameLabel} htmlFor="usb-signer-display-name">
-          <input
-            id="usb-signer-display-name"
-            value={form.signerDisplayName}
-            placeholder={u.signerNamePlaceholder}
-            onChange={(event) => onUpdate("signerDisplayName", event.target.value)}
-            className="h-9 w-full rounded-md border border-border bg-surface px-2 text-[12px] text-fg"
-          />
-          <p className="mt-1.5 text-[10.5px] leading-relaxed text-fg-muted">{u.signerNameHint}</p>
-        </Field>
-
         <div>
           <button
             type="button"
@@ -1440,6 +1430,8 @@ function UsbTokenCard({
           ) : null}
         </div>
 
+        {/* Trả lời trước câu hỏi "tên người ký điền ở đâu" — ô đó đã bị bỏ. */}
+        <p className="text-[10.5px] leading-relaxed text-fg-muted">{u.signerNameNote}</p>
         <p className="text-[10.5px] leading-relaxed text-fg-muted">{u.note}</p>
         {/* Vì sao dropdown thuật toán của luồng này ngắn hơn các luồng khác. */}
         <p className="text-[10.5px] leading-relaxed text-fg-muted">{u.algorithmNote}</p>
@@ -1499,8 +1491,9 @@ function SignCloudCard({
           ...enrollmentImagePayload(enrollment),
         },
       });
+      // Chỉ vào form. `agreementUuid` KHÔNG được lưu xuống trình duyệt: nó gắn
+      // với hồ sơ CCCD của người ký này và không được sống quá lượt ký này.
       onUpdate("agreementUuid", result.agreementUuid);
-      saveAgreementUuid(result.agreementUuid);
       setSicUrl(result.sicUrl ?? undefined);
       setStatusResult(undefined);
       setSicBlocked(false);
@@ -1582,7 +1575,6 @@ function SignCloudCard({
   /** Quay lại bước đăng ký: bỏ uuid hiện tại và mọi dấu vết của lần xác nhận trước. */
   function restartEnrollment() {
     onUpdate("agreementUuid", "");
-    clearAgreementUuid();
     onAgreementStageChange("UNKNOWN");
     setSicUrl(undefined);
     setStatusResult(undefined);
@@ -1594,28 +1586,32 @@ function SignCloudCard({
   return (
     <ConfigCard title={e.title}>
       <div className="space-y-3">
-        <Field label={e.signerNameLabel} htmlFor="signer-display-name">
-          <input
-            id="signer-display-name"
-            value={form.signerDisplayName}
-            placeholder={e.signerNamePlaceholder}
-            onChange={(event) => onUpdate("signerDisplayName", event.target.value)}
-            className="h-9 w-full rounded-md border border-border bg-surface px-2 text-[12px] text-fg"
-          />
-          <p className="mt-1.5 text-[10.5px] text-fg-muted">{e.signerNameHint}</p>
-        </Field>
+        {/* Trả lời trước câu hỏi "tên người ký điền ở đâu" — ô đó đã bị bỏ. */}
+        <p className="text-[10.5px] leading-relaxed text-fg-muted">{e.signerNameNote}</p>
 
         {/*
-          Đã READY thì agreement bị khoá: sửa tay một uuid vừa xác nhận xong chỉ
-          có thể là nhầm. Đường ra duy nhất là tạo lại — và nó nói rõ hậu quả.
+          `agreementUuid` CHỈ ĐỌC, ở mọi trạng thái. Nó là định danh CA cấp về
+          trong response của yêu cầu đăng ký chứng thư — gõ tay một chuỗi vào đây
+          là trỏ sang hồ sơ của người khác, hoặc sang một hồ sơ không tồn tại mà
+          màn hình không có cách nào biết (kiểm tra được thì tốn một lượt ký).
+          Đường duy nhất để có giá trị khác là đăng ký lại, và nút dưới nói rõ
+          cái giá của việc đó.
         */}
-        {locked ? (
+        {form.agreementUuid ? (
           <Field label={e.agreementLabel}>
-            <div className="rounded-md border border-success bg-success-subtle p-2.5">
-              <div className="flex items-center gap-1.5">
-                <CheckIcon size={13} className="shrink-0 text-success" />
-                <p className="text-[11px] font-semibold text-success">{e.agreementReady}</p>
-              </div>
+            <div
+              className={`rounded-md border p-2.5 ${
+                locked ? "border-success bg-success-subtle" : "border-border bg-inset"
+              }`}
+            >
+              {locked ? (
+                <div className="flex items-center gap-1.5">
+                  <CheckIcon size={13} className="shrink-0 text-success" />
+                  <p className="text-[11px] font-semibold text-success">{e.agreementReady}</p>
+                </div>
+              ) : (
+                <p className="text-[11px] font-semibold text-fg-muted">{e.agreementIssued}</p>
+              )}
               <p className="mt-1.5 break-all font-mono text-[11px] text-fg">{form.agreementUuid}</p>
             </div>
             <button
@@ -1623,40 +1619,16 @@ function SignCloudCard({
               onClick={restartEnrollment}
               className="mt-2 h-8 w-full rounded-md border border-border bg-surface text-[11.5px] font-semibold text-fg"
             >
-              {e.agreementRecreate}
+              {locked ? e.agreementRecreate : e.forget}
             </button>
             <p className="mt-1.5 text-[10.5px] leading-relaxed text-fg-muted">
-              {e.agreementRecreateHint}
+              {locked ? e.agreementRecreateHint : e.agreementHint}
             </p>
           </Field>
         ) : (
-          <Field label={e.agreementLabel} htmlFor="agreement-uuid">
-            <div className="flex gap-2">
-              <input
-                id="agreement-uuid"
-                value={form.agreementUuid}
-                placeholder={e.agreementPlaceholder}
-                spellCheck={false}
-                onChange={(event) => {
-                  onUpdate("agreementUuid", event.target.value);
-                  saveAgreementUuid(event.target.value);
-                  // Gõ tay là chuyển sang một agreement khác: những gì biết được
-                  // về lần đăng ký vừa tạo không còn nói gì về uuid này nữa.
-                  onAgreementStageChange("UNKNOWN");
-                  setSicUrl(undefined);
-                  setStatusResult(undefined);
-                }}
-                className="h-9 min-w-0 flex-1 rounded-md border border-border bg-surface px-2 font-mono text-[11px] text-fg"
-              />
-              {form.agreementUuid ? (
-                <button
-                  type="button"
-                  onClick={restartEnrollment}
-                  className="h-9 shrink-0 rounded-md border border-border bg-surface px-3 text-[11.5px] font-semibold text-fg"
-                >
-                  {e.forget}
-                </button>
-              ) : null}
+          <Field label={e.agreementLabel}>
+            <div className="rounded-md border border-dashed border-border bg-inset p-2.5">
+              <p className="text-[11px] leading-relaxed text-fg-muted">{e.agreementEmpty}</p>
             </div>
             <p className="mt-1.5 text-[10.5px] leading-relaxed text-fg-muted">{e.agreementHint}</p>
           </Field>
@@ -2392,6 +2364,10 @@ function SigningResultDialog({
       <p className="px-5 pb-1 pt-3 text-[11.5px] leading-relaxed text-fg-muted">
         {t.sign.result.inMemoryNote}
       </p>
+      {/* Nút "ký lại" vứt bỏ kết quả vừa ký — phải nói trước, không phải nói sau. */}
+      <p className="px-5 pb-1 pt-2 text-[11.5px] leading-relaxed text-fg-muted">
+        {t.sign.result.signAgainHint}
+      </p>
 
       <div className="flex flex-wrap justify-end gap-2 border-t border-border-muted px-5 py-3">
         <button
@@ -2400,7 +2376,7 @@ function SigningResultDialog({
           disabled={!document}
           className="h-8.5 rounded-md border border-border bg-surface px-4 text-[12.5px] font-semibold text-fg disabled:opacity-55"
         >
-          {t.sign.result.signAgainOnResult}
+          {t.sign.result.signAgainSameSignature}
         </button>
         <button
           type="button"

@@ -81,8 +81,9 @@ export function enrollmentComplete(enrollment: EnrollmentFormState): boolean {
  * Agreement đang dùng đã qua bước xác nhận danh tính trên trang SIC chưa — chỉ
  * biết được TRONG phiên làm việc này.
  *
- * - `UNKNOWN` — uuid gõ tay hoặc khôi phục từ lần trước. KHÔNG chặn ký: cách duy
- *   nhất để biết chắc là gọi API status, mà mỗi lần gọi trừ một lượt ký.
+ * - `UNKNOWN` — uuid khôi phục từ lần làm việc trước (màn hình không cho gõ tay,
+ *   giá trị luôn là thứ CA đã cấp về). KHÔNG chặn ký: cách duy nhất để biết chắc
+ *   là gọi API status, mà mỗi lần gọi trừ một lượt ký.
  * - `AWAITING_CONFIRMATION` — vừa đăng ký ở phiên này, người ký chưa xác nhận
  *   xong trên trang SIC. Ký lúc này chắc chắn hỏng nên chặn luôn.
  * - `READY` — status trả `READY`, chứng thư sẵn sàng.
@@ -134,7 +135,6 @@ export interface SignFormState {
 
   /* FPT eSign Cloud */
   agreementUuid: string;
-  signerDisplayName: string;
   documentName: string;
   enrollment: EnrollmentFormState;
 }
@@ -270,7 +270,6 @@ export function resolveFormState(
     mpkiCredentialId: previous?.mpkiCredentialId ?? "",
 
     agreementUuid: previous?.agreementUuid ?? "",
-    signerDisplayName: previous?.signerDisplayName ?? "",
     documentName: previous?.documentName ?? "",
     enrollment: previous?.enrollment ?? { ...EMPTY_ENROLLMENT },
   };
@@ -345,9 +344,11 @@ export function buildStartRequest(input: {
   }
 
   // FPT_SIGN_CLOUD
-  if (form.signerDisplayName.trim()) {
-    payload.remoteCa.signerDisplayName = form.signerDisplayName.trim();
-  }
+  //
+  // `signerDisplayName` CỐ Ý không gửi: tên trên chữ ký phải là tên trong chứng
+  // thư do CA cấp, không phải một chuỗi người dùng tự gõ ở màn hình này. Màn
+  // hình không có cách nào biết tên đó (chứng thư chỉ tồn tại sau khi nhập OTP),
+  // nên nó không đoán — dịch vụ ký lấy tên từ hồ sơ đăng ký / chứng thư.
   if (form.agreementUuid.trim()) {
     payload.remoteCa.agreementUuid = form.agreementUuid.trim();
     return payload;
@@ -371,23 +372,26 @@ export function buildStartRequest(input: {
 }
 
 /**
- * Phần `request` của multipart tạo job USB Token.
+ * Phần `request` của multipart tạo job USB Token, TRỪ `signerDisplayName`.
  *
  * Cùng ba quy tắc với `buildStartRequest` — `targetSignatureId` chỉ đi cùng
  * COUNTER_SIGN, toạ độ chỉ gửi khi có khung ký, trường rỗng thì bỏ hẳn — nhưng
  * KHÔNG dùng lại `buildStartRequest`: hai endpoint có hợp đồng khác nhau, và
  * ghép chung sẽ đẩy `materialMode`/`remoteCa` vào một body không nhận chúng.
+ *
+ * Tên người ký KHÔNG dựng được từ form: nó phải là CN của chứng thư trong token,
+ * mà chứng thư chỉ đọc được sau khi người ký chọn trong hộp thoại ký. Kiểu trả
+ * về vì thế thiếu đúng trường đó — `UsbTokenSignDialog` là chỗ duy nhất điền nó.
  */
 export function buildUsbTokenJobRequest(input: {
   form: SignFormState;
   geometry?: SignAppearanceGeometry;
-}): UsbTokenJobRequest {
+}): Omit<UsbTokenJobRequest, "signerDisplayName"> {
   const { form, geometry } = input;
 
-  const request: UsbTokenJobRequest = {
+  const request: Omit<UsbTokenJobRequest, "signerDisplayName"> = {
     algorithm: form.algorithm,
     baselineLevel: form.baselineLevel,
-    signerDisplayName: form.signerDisplayName.trim(),
   };
 
   if (form.signatureMode) request.signatureMode = form.signatureMode;
@@ -481,7 +485,6 @@ export interface SignFormValidationMessages {
   p12PasswordRequired: string;
   mpkiUsernameRequired: string;
   mpkiCredentialRequired: string;
-  signerDisplayNameRequired: string;
   enrollmentRequired: string;
   agreementRequired: string;
   agreementNotReady: string;
@@ -570,19 +573,11 @@ export function validateSignForm(input: {
     }
   }
 
-  // Tên người ký: eSign Cloud và USB Token đều dựng PDF trước khi có chứng thư,
-  // nên không có CN nào để lấy tên. Phần còn lại của luồng USB Token (agent chạy
-  // chưa, có chứng thư nào không) chỉ biết được lúc bấm ký — hộp thoại ký lo.
-  if (isUsbToken(source)) {
-    if (source.requiresSignerDisplayName !== false && !form.signerDisplayName.trim()) {
-      add("credential", messages.signerDisplayNameRequired);
-    }
-  }
+  // USB Token không có gì để kiểm ở đây: agent chạy chưa, token có chứng thư nào
+  // — chỉ biết được lúc bấm ký, và hộp thoại ký lo. Tên người ký cũng vậy: nó là
+  // CN của chứng thư người ký chọn trong hộp thoại đó, không phải một ô trên form.
 
   if (isSignCloud(source)) {
-    if (source.requiresSignerDisplayName !== false && !form.signerDisplayName.trim()) {
-      add("credential", messages.signerDisplayNameRequired);
-    }
     if (form.agreementUuid.trim()) {
       // Đăng ký vừa tạo ở phiên này mà chưa xác nhận danh tính xong: chứng thư
       // chưa tồn tại, ký bây giờ là ném đi một lượt START đã bị tính phí.

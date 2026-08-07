@@ -11,9 +11,11 @@ import type { MaterialMode, RemoteCaVendor, SignStatus } from "@/lib/types/signi
  * Luồng p12 và MPKI App không cần: chúng xong ngay trong một request.
  *
  * KHÔNG lưu: `nextUrl` (mang token giao dịch dùng một lần), mật khẩu .p12, nội
- * dung tài liệu, và toàn bộ `agreementDetails` (dữ liệu cá nhân). `agreementUuid`
- * được lưu riêng vì nó là định danh dài hạn và việc đăng ký lại tốn một giao
- * dịch bên FPT.
+ * dung tài liệu, toàn bộ `agreementDetails` (dữ liệu cá nhân), và cả
+ * `agreementUuid` — xem `clearAgreementUuid`.
+ *
+ * Bản ghi phiên là NGOẠI LỆ DUY NHẤT, và nó không phải "thông tin của lần ký
+ * trước": nó thuộc về một lần ký CHƯA XONG mà tiền đã trả rồi.
  */
 
 const SESSION_KEY = "sign:session:v1";
@@ -90,19 +92,16 @@ export function clearSessionRecord(): void {
 }
 
 /**
- * `agreementUuid` là định danh người ký trên CA, dùng lại cho MỌI lần ký sau.
- * Giữ nó là cách duy nhất để lần ký thứ hai không kích hoạt một lần đăng ký
- * chứng thư mới — mỗi lần đăng ký là một giao dịch bên FPT.
+ * Xoá `agreementUuid` còn sót trong trình duyệt.
+ *
+ * Màn ký KHÔNG lưu định danh này nữa — không giữ gì từ lần ký trước là một quyết
+ * định có chủ đích, và cái giá của nó đã biết: lần ký sau phải đăng ký chứng thư
+ * lại, tức thêm một giao dịch bên FPT.
+ *
+ * Hàm còn ở đây vì các bản trước CÓ ghi khoá này. Không còn ai đọc nó, nhưng nó
+ * gắn với hồ sơ CCCD của người ký nên để nằm lại trong `localStorage` mãi là
+ * đúng thứ mà quyết định trên muốn tránh — màn ký dọn nó đúng một lần lúc mở.
  */
-export function loadAgreementUuid(): string | null {
-  const value = readJson<string>(AGREEMENT_KEY);
-  return typeof value === "string" && value ? value : null;
-}
-
-export function saveAgreementUuid(agreementUuid: string): void {
-  if (agreementUuid.trim()) writeJson(AGREEMENT_KEY, agreementUuid.trim());
-}
-
 export function clearAgreementUuid(): void {
   remove(AGREEMENT_KEY);
 }

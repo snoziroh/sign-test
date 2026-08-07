@@ -150,7 +150,7 @@ function ToastCard({
       <div className="min-w-0 flex-1 pt-0.5">
         <p className="text-[13px] font-semibold text-fg">{toast.title}</p>
         {toast.description ? (
-          <p className="mt-0.5 text-[12px] leading-relaxed break-words text-fg-muted">
+          <p className="mt-0.5 text-[12px] leading-relaxed wrap-break-word text-fg-muted">
             {toast.description}
           </p>
         ) : null}

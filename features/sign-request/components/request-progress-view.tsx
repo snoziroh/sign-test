@@ -175,7 +175,7 @@ export function RequestProgressView({
 
         <div className="flex flex-col gap-4">
           <section className="rounded-lg border border-border bg-surface shadow-sm">
-            <h3 className="border-b border-border-muted px-4 py-2.5 font-mono text-[10.5px] uppercase tracking-[0.1em] text-fg-subtle">
+            <h3 className="border-b border-border-muted px-4 py-2.5 font-mono text-[10.5px] uppercase tracking-widest text-fg-subtle">
               {p.timelineTitle}
             </h3>
             <Timeline t={t} record={record} />
@@ -183,7 +183,7 @@ export function RequestProgressView({
 
           {linkSigners.length > 0 ? (
             <section className="rounded-lg border border-border bg-surface shadow-sm">
-              <h3 className="border-b border-border-muted px-4 py-2.5 font-mono text-[10.5px] uppercase tracking-[0.1em] text-fg-subtle">
+              <h3 className="border-b border-border-muted px-4 py-2.5 font-mono text-[10.5px] uppercase tracking-widest text-fg-subtle">
                 {t.signRequest.flow.palette.linkGroup}
               </h3>
               <ul className="flex flex-col gap-1.5 p-3">
@@ -313,7 +313,7 @@ function Timeline({ t, record }: { t: Dictionary; record: SignRequestRecord }) {
         <li key={entry.id} className="relative">
           <span
             aria-hidden="true"
-            className={`absolute -left-[1.05rem] top-0.5 flex size-3.5 items-center justify-center rounded-full ring-3 ring-surface ${
+            className={`absolute left-[-1.05rem] top-0.5 flex size-3.5 items-center justify-center rounded-full ring-3 ring-surface ${
               entry.tone === "done"
                 ? "bg-success text-success"
                 : entry.tone === "active"

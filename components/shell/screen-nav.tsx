@@ -3,25 +3,28 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useLocale } from "@/components/i18n/locale-provider";
+import { SCREEN_ROUTES } from "@/components/shell/routes";
 
 /**
- * Chuyển giữa hai màn của bàn thử. Dùng `Link` chứ không phải nút đổi tab trong
+ * Chuyển giữa ba màn của bàn thử. Dùng `Link` chứ không phải nút đổi tab trong
  * cùng một trang: mỗi màn giữ trạng thái nặng riêng (tệp đang chọn, preview đã
  * render, phiên ký đang chạy), và một URL riêng cho phép mở hai màn ở hai tab
  * cùng lúc — thứ hay dùng khi ký ở tab này rồi verify kết quả ở tab kia.
+ *
+ * Chỉ là nhóm tab: lối quay về `/` và khoảng cách quanh nó do `AppNavbar` đặt,
+ * vì cụm này chỉ xuất hiện bên trong navbar.
  */
 export function ScreenNav() {
   const pathname = usePathname();
   const { t } = useLocale();
 
-  const items = [
-    { href: "/", label: t.routes.sign.label },
-    { href: "/sign-request", label: t.routes.signRequest.label },
-    { href: "/verify", label: t.routes.verify.label },
-  ];
+  const items = SCREEN_ROUTES.map((route) => ({
+    href: route.href,
+    label: t.routes[route.key].label,
+  }));
 
   return (
-    <nav aria-label={t.nav.primaryLabel} className="mb-5">
+    <nav aria-label={t.nav.primaryLabel}>
       <ul className="inline-flex gap-0.5 rounded-lg bg-inset p-[3px]">
         {items.map((item) => {
           const active = pathname === item.href;

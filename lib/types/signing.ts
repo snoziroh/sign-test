@@ -166,7 +166,13 @@ export interface SignatureSource {
   requiresUploadedKeyFile?: boolean;
   /** MPKI: phải chọn credential khi người ký có nhiều hơn một. */
   requiresCredentialSelection?: boolean;
-  /** eSign Cloud: chứng thư chưa tồn tại nên không có CN để lấy tên. */
+  /**
+   * Nguồn đòi client gửi kèm tên người ký hay không.
+   *
+   * KHÔNG còn chỗ nào trong màn hình đọc cờ này: tên trên chữ ký phải là tên
+   * trong chứng thư do CA cấp, nên không có ô nhập tay nào để bật lên nữa. Giữ
+   * lại vì `/capabilities` vẫn trả về nó.
+   */
   requiresSignerDisplayName?: boolean;
   /** eSign Cloud: cần `agreementUuid` có sẵn hoặc khối `enrollment` đầy đủ. */
   requiresEnrollment?: boolean;
@@ -242,7 +248,14 @@ export interface RemoteCaSignRequest {
   documentName?: string;
   /** eSign Cloud — có giá trị thì `enrollment` bị bỏ qua (không đăng ký lại). */
   agreementUuid?: string;
-  /** eSign Cloud — bắt buộc; MPKI gửi cũng bị bỏ qua (tên lấy từ CN chứng thư). */
+  /**
+   * MPKI gửi cũng bị bỏ qua (tên lấy từ CN chứng thư).
+   *
+   * Client KHÔNG còn gửi trường này cho eSign Cloud: không có nguồn đáng tin nào
+   * ở phía trình duyệt để lấy tên — chứng thư chỉ được cấp sau khi nhập OTP —
+   * nên tên phải do dịch vụ ký lấy từ hồ sơ đăng ký / chứng thư. Trường vẫn nằm
+   * trong kiểu vì hợp đồng API còn nhận nó.
+   */
   signerDisplayName?: string;
   enrollment?: FptEnrollmentRequest;
 }
@@ -358,8 +371,11 @@ export interface FptEnrollmentStatusResponse {
 
 /**
  * Phần `request` (JSON) của multipart tạo job. Cùng quy ước toạ độ với `/sign`,
- * nhưng `signerDisplayName` là BẮT BUỘC: PDF được dựng trước khi người dùng chọn
- * chứng thư, nên chưa có CN nào để lấy tên.
+ * nhưng `signerDisplayName` là BẮT BUỘC: khung chữ ký được vẽ vào PDF ngay ở lời
+ * gọi này, trước khi có chữ ký nào để đọc tên ra.
+ *
+ * Giá trị luôn là CN của chứng thư người ký đã chọn trong hộp thoại — vì thế
+ * `UsbTokenSignDialog` chọn chứng thư TRƯỚC khi tạo job.
  */
 export interface UsbTokenJobRequest {
   /**

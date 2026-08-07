@@ -323,15 +323,16 @@ export function SignRequestWorkspace() {
 
       {/* -------------------- Thanh điều hướng -------------------- */}
       <nav className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-surface px-4 py-3 shadow-sm">
-        <button
-          type="button"
-          disabled={activeIndex === 0}
-          onClick={() => setWizardStep(WIZARD_ORDER[activeIndex - 1])}
-          className="inline-flex h-8.5 items-center gap-1.5 rounded-md border border-border bg-surface px-3.5 text-[12.5px] font-semibold text-fg disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          <ArrowLeftIcon size={14} />
-          {s.back}
-        </button>
+        {(activeIndex !== 0) ? (
+          <button
+            type="button"
+            onClick={() => setWizardStep(WIZARD_ORDER[activeIndex - 1])}
+            className="inline-flex h-8.5 items-center gap-1.5 rounded-md border border-border bg-surface px-3.5 text-[12.5px] font-semibold text-fg disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            <ArrowLeftIcon size={14} />
+            {s.back}
+          </button>                                       
+        ): (<div></div>)}
 
         {wizardStep === "review" ? (
           <button

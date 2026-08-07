@@ -23,6 +23,11 @@ export const vi: Dictionary = {
   },
 
   routes: {
+    home: {
+      label: "Trang chủ",
+      title: "Công cụ hỗ trợ ký của FIS CA",
+      description: "Chọn màn để bắt đầu — ký, tạo yêu cầu ký, hoặc xác minh",
+    },
     login: {
       label: "Đăng nhập",
       title: "Đăng nhập vào hệ thống Sigil",
@@ -100,6 +105,8 @@ export const vi: Dictionary = {
     openMenu: "Mở menu điều hướng",
     closeMenu: "Đóng menu điều hướng",
     navigationTitle: "Điều hướng",
+    backToHome: "Trang chủ",
+    open: "Mở",
   },
 
   shell: {
@@ -367,7 +374,7 @@ export const vi: Dictionary = {
       summaryUnset: "—",
       restart: "Ký lại từ đầu",
       restartHint:
-        "Xoá tài liệu, khoá ký và mọi lựa chọn — trang trở về đúng trạng thái lúc mới mở. Tải file đã ký về trước: nó chỉ tồn tại trong trang này.",
+        "Xoá tài liệu, khoá ký và mọi lựa chọn — trang trở về đúng trạng thái lúc mới mở. Mất luôn cả agreementUuid, nên lần ký eSign Cloud sau phải đăng ký lại: thêm một giao dịch bên FPT. Tải file đã ký về trước: nó chỉ tồn tại trong trang này.",
     },
     document: {
       sectionTitle: "Tài liệu",
@@ -462,7 +469,9 @@ export const vi: Dictionary = {
       profile: "Hồ sơ",
       inMemoryNote:
         "File đã ký chỉ nằm trong trang này: response mang nó về dưới dạng base64 và KHÔNG có endpoint nào tải lại được. Hãy tải xuống trước khi rời màn hình.",
-      signAgainOnResult: "Ký tiếp trên kết quả này",
+      signAgainSameSignature: "Ký lại với chữ ký này",
+      signAgainHint:
+        "Ký lại sẽ giữ nguyên cấu hình chữ ký này và đưa bản xem trước về lại tài liệu chưa ký — kết quả ở trên bị bỏ đi. Cần thì tải nó về trước.",
       download: "Tải file đã ký",
     },
     source: {
@@ -510,14 +519,14 @@ export const vi: Dictionary = {
     },
     esign: {
       title: "FPT eSign Cloud (OTP)",
-      signerNameLabel: "Tên người ký",
-      signerNamePlaceholder: "Nguyễn Văn A",
-      signerNameHint:
-        "Chỉ luồng này bắt buộc: chứng thư chỉ được cấp sau khi nhập OTP nên chưa có CN nào để lấy tên.",
+      signerNameNote:
+        "Tên trên chữ ký lấy từ chứng thư CA cấp cho hồ sơ đăng ký này. Màn hình này không hỏi tên người ký.",
       agreementLabel: "agreementUuid",
-      agreementPlaceholder: "Lần ký đầu thì để trống",
+      agreementIssued: "Do yêu cầu đăng ký cấp về",
+      agreementEmpty:
+        "Chưa có. Định danh này do CA cấp trong response của yêu cầu đăng ký bên dưới — không nhập tay được.",
       agreementHint:
-        "Định danh người ký trên CA. Dùng lại cho mọi lần ký sau — mỗi lần đăng ký là một giao dịch mới bên FPT. Được lưu trong trình duyệt này.",
+        "Định danh người ký trên CA, lấy thẳng từ response đăng ký chứ không do người dùng gõ vào. Nó chỉ sống trong lượt ký này — trình duyệt không giữ lại gì, nên ký lại từ đầu là phải đăng ký lại, tức thêm một giao dịch bên FPT.",
       forget: "Xoá",
       agreementReady: "Đã xác nhận danh tính — chứng thư sẵn sàng",
       agreementRecreate: "Tạo lại agreement",
@@ -579,10 +588,8 @@ export const vi: Dictionary = {
     },
     usbToken: {
       title: "FPT USB Token",
-      signerNameLabel: "Tên người ký",
-      signerNamePlaceholder: "Nguyễn Văn A",
-      signerNameHint:
-        "Bắt buộc ở luồng này: PDF được dựng trước khi chọn chứng thư nên chưa có CN nào để lấy tên.",
+      signerNameNote:
+        "Tên trên chữ ký lấy từ CN của chứng thư được chọn trong token, không bao giờ lấy từ màn hình này.",
       checkAgent: "Kiểm tra Signing Agent",
       agentChecking: "Đang kiểm tra…",
       agentReady: (count: number) =>
@@ -736,7 +743,6 @@ export const vi: Dictionary = {
       p12PasswordRequired: "Mật khẩu file khoá là bắt buộc.",
       mpkiUsernameRequired: "Nhập username MPKI của người ký.",
       mpkiCredentialRequired: "Chọn credential dùng để ký.",
-      signerDisplayNameRequired: "eSign Cloud bắt buộc có tên người ký.",
       enrollmentRequired:
         "Chưa có agreementUuid thì phần đăng ký cần họ tên, số CCCD, số điện thoại, email và ảnh hai mặt CCCD.",
       agreementRequired:
