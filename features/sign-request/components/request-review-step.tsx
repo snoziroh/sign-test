@@ -9,6 +9,7 @@ import {
   FileTextIcon,
   LayersIcon,
   PenLineIcon,
+  SlidersIcon,
 } from "@/components/ui/icons";
 import { formatBytes } from "@/features/signing/document-format";
 import { avatarTone, initialsOf } from "../directory";
@@ -33,19 +34,34 @@ export function RequestReviewStep({
   document,
   documentFormat,
   issues,
+  actorMissing,
+  templateName,
+  variableSummary,
   onPatch,
   onGoToStep,
+  onGoToVariables,
 }: {
   t: Dictionary;
   draft: SignRequestDraft;
   document?: File;
   documentFormat?: DocumentFormat;
   issues: DraftIssue[];
+  /**
+   * Chưa chọn danh tính người thao tác. Không phải một `DraftIssue`: nó không
+   * nói về bản nháp mà nói về cấu hình của màn hình, và sửa nó là bấm vào nút
+   * trên header chứ không phải quay lại một bước nào.
+   */
+  actorMissing: boolean;
+  /** Có mặt khi yêu cầu được dựng từ một mẫu. */
+  templateName?: string;
+  variableSummary?: { key: string; label: string; value: string; filled: boolean }[];
   onPatch: (patch: Partial<SignRequestDraft>) => void;
   onGoToStep: (stepIndex: number) => void;
+  onGoToVariables: () => void;
 }) {
   const r = t.signRequest.review;
   const c = t.signRequest.flow.canvas;
+  const tpl = t.signRequest.template;
   const signatures = totalSlots(draft.steps);
 
   return (
@@ -108,6 +124,19 @@ export function RequestReviewStep({
             onChange={(notifyOnComplete) => onPatch({ notifyOnComplete })}
           />
         </div>
+
+        {/*
+         * Ranh giới giữa "đã gửi lên" và "chỉ nằm ở máy này".
+         *
+         * `POST /api/signing-requests` nhận đúng ba thứ: tên yêu cầu, nguồn tài
+         * liệu và danh sách người ký. Hạn ký, lời nhắn và hai công tắc ngay trên
+         * đây không có trường nào để chở. Chúng vẫn hiện trên màn tiến trình, nên
+         * nếu không nói ra thì người dùng có mọi lý do để tin là chúng đã đi cùng
+         * yêu cầu — và sẽ chờ những email không bao giờ được gửi.
+         */}
+        <p className="rounded-md bg-inset p-2.5 text-[10.5px] leading-relaxed text-fg-muted">
+          {r.localOnlyNote}
+        </p>
       </section>
 
       {/* ---------------- Tóm tắt ---------------- */}
@@ -190,6 +219,62 @@ export function RequestReviewStep({
           </ol>
         </section>
 
+        {/* Yêu cầu dựng từ mẫu: nhắc lại mẫu nào và những gì đã điền. Đây là lần
+            cuối người soạn nhìn thấy các giá trị đó trước khi chúng đi vào tài
+            liệu mà ba bốn người sắp ký. */}
+        {templateName ? (
+          <section className="rounded-lg border border-border bg-surface shadow-sm">
+            <h3 className="flex items-center gap-2 border-b border-border-muted px-4 py-2.5 font-mono text-[10.5px] uppercase tracking-[0.1em] text-fg-subtle">
+              <LayersIcon size={13} />
+              {tpl.review.section}
+            </h3>
+            <div className="flex flex-wrap items-center gap-2 px-4 py-3">
+              <span className="text-[12.5px] font-semibold text-fg">{templateName}</span>
+              {variableSummary && variableSummary.length > 0 ? (
+                <button
+                  type="button"
+                  onClick={onGoToVariables}
+                  className="ml-auto inline-flex h-7.5 items-center gap-1.5 rounded-md border border-border bg-surface px-2.5 text-[11.5px] font-semibold text-fg-muted hover:border-accent hover:text-accent"
+                >
+                  <SlidersIcon size={13} />
+                  {tpl.review.edit}
+                </button>
+              ) : null}
+            </div>
+
+            {variableSummary && variableSummary.length > 0 ? (
+              <dl className="grid gap-x-4 gap-y-1.5 border-t border-border-muted px-4 py-3 sm:grid-cols-2">
+                {variableSummary.map((entry) => (
+                  <div key={entry.key} className="flex min-w-0 items-baseline gap-2">
+                    <dt className="shrink-0 text-[11.5px] text-fg-muted">{entry.label}</dt>
+                    <dd
+                      className={`min-w-0 flex-1 truncate text-right text-[11.5px] font-semibold ${
+                        entry.filled ? "text-fg" : "text-warning"
+                      }`}
+                    >
+                      {entry.filled ? entry.value : tpl.variables.unfilled}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            ) : null}
+          </section>
+        ) : null}
+
+        {actorMissing ? (
+          <section className="flex items-start gap-3 rounded-lg border border-warning bg-warning-subtle px-4 py-3">
+            <AlertTriangleIcon size={17} className="mt-0.5 shrink-0 text-warning" />
+            <div>
+              <p className="text-[12.5px] font-semibold text-fg">
+                {t.signRequest.actor.required}
+              </p>
+              <p className="mt-0.5 text-[11.5px] text-fg-muted">
+                {t.signRequest.actor.requiredHint}
+              </p>
+            </div>
+          </section>
+        ) : null}
+
         {issues.length === 0 ? (
           <section className="flex items-start gap-3 rounded-lg border border-success bg-success-subtle px-4 py-3">
             <span aria-hidden="true" className="mt-0.5 text-success">
@@ -222,6 +307,14 @@ export function RequestReviewStep({
                     >
                       {r.goToStep(issue.stepIndex + 1)}
                     </button>
+                  ) : issue.code === "MISSING_VARIABLE" ? (
+                    <button
+                      type="button"
+                      onClick={onGoToVariables}
+                      className="shrink-0 rounded border border-border bg-surface px-2 py-0.5 text-[11px] font-semibold text-fg-muted hover:border-accent hover:text-accent"
+                    >
+                      {tpl.review.goToVariables}
+                    </button>
                   ) : null}
                 </li>
               ))}
@@ -250,6 +343,8 @@ export function describeIssue(t: Dictionary, issue: DraftIssue): string {
       return messages.LINK_WITHOUT_EMAIL(step);
     case "DUPLICATE_IN_STEP":
       return messages.DUPLICATE_IN_STEP(step, issue.signerName ?? "");
+    case "MISSING_VARIABLE":
+      return messages.MISSING_VARIABLE(issue.variableLabel ?? "");
   }
 }
 

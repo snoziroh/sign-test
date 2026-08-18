@@ -9,9 +9,11 @@ import {
   ClockIcon,
   GripVerticalIcon,
   LinkIcon,
+  LockIcon,
   PlusIcon,
   TrashIcon,
   UserPlusIcon,
+  UsersIcon,
   XIcon,
 } from "@/components/ui/icons";
 import { avatarTone, initialsOf } from "../directory";
@@ -66,6 +68,18 @@ function signerDropEffect(drag?: FlowDrag): "copy" | "move" {
 export interface FlowEditHandlers {
   drag?: FlowDrag;
   setDrag: (drag?: FlowDrag) => void;
+  /**
+   * Luồng đến từ một MẪU ĐÃ PUBLISH: gán được người, nhưng không thêm/bớt/đổi
+   * chỗ được ô nào.
+   *
+   * Không phải để giao diện gọn hơn — đó là ràng buộc của backend.
+   * `POST /api/signing-requests` với nguồn mẫu chép số ô, thứ tự bước và toạ độ
+   * từng khung chữ ký từ bản đã publish, và từ chối thẳng nếu client gửi kèm
+   * `signingOrder` hay `signatureSlots`. Cho kéo thả rồi vứt kết quả đi ở bước
+   * cuối là kiểu giao diện tệ nhất: người dùng bỏ công sắp xếp một thứ không có
+   * tác dụng gì.
+   */
+  lockStructure?: boolean;
   /** Bước đang được chọn — đích của nút "+" trên danh bạ bên trái. */
   selectedStepId: string;
   selectStep: (stepId: string) => void;
@@ -99,6 +113,12 @@ export function FlowCanvas({
   const [overSlot, setOverSlot] = useState<{ stepId: string; index: number }>();
   const [overNewStep, setOverNewStep] = useState(false);
   const active = activeStepIndex(steps);
+  /**
+   * `edit` trả lời "màn này sửa được không", `shape` trả lời "sửa được CẤU TRÚC
+   * không". Luồng từ mẫu có `edit` mà không có `shape`: gán người thì được, đổi
+   * số ô thì không.
+   */
+  const shape = edit && !edit.lockStructure ? edit : undefined;
 
   function clearHover() {
     setOverStepId(undefined);
@@ -121,6 +141,7 @@ export function FlowCanvas({
             progressState={edit ? undefined : laneState(steps, index, active)}
             onOpenSlot={onOpenSlot}
             edit={edit}
+            shape={shape}
             hover={{
               overStepId,
               overSlot,
@@ -130,10 +151,15 @@ export function FlowCanvas({
             }}
             slotStatusOf={(slot) => slotStatus(steps, index, slot)}
           />
+
+          {/* Cảnh báo cấp bước sống NGOÀI ô bước: nó nói về cả cái bước, không
+              phải về một ô ký nào trong đó, và ở ngoài thì nó không đẩy các ô ký
+              xuống mỗi lần người dùng thêm một bước mới. */}
+          <StepIssueNote t={t} issues={edit?.issues} stepIndex={index} />
         </div>
       ))}
 
-      {edit ? (
+      {shape ? (
         <>
           <StepConnector t={t} muted />
 
@@ -141,10 +167,10 @@ export function FlowCanvas({
               không phải bấm thêm bước rồi mới kéo. */}
           <div
             onDragOver={(event) => {
-              if (!isSignerDrag(edit.drag)) return;
+              if (!isSignerDrag(shape.drag)) return;
 
               event.preventDefault();
-              event.dataTransfer.dropEffect = signerDropEffect(edit.drag);
+              event.dataTransfer.dropEffect = signerDropEffect(shape.drag);
 
               setOverNewStep(true);
             }}
@@ -153,23 +179,23 @@ export function FlowCanvas({
               setOverNewStep(false);
             }}
             onDrop={(event) => {
-              if (!isSignerDrag(edit.drag)) return;
+              if (!isSignerDrag(shape.drag)) return;
               event.preventDefault();
-              edit.dropAsNewStep();
-              edit.setDrag(undefined);
+              shape.dropAsNewStep();
+              shape.setDrag(undefined);
               clearHover();
             }}
             className={`flex flex-wrap items-center justify-center gap-3 rounded-lg border-2 border-dashed px-4 py-4 transition-colors ${
               overNewStep
                 ? "border-accent bg-accent-subtle"
-                : isSignerDrag(edit.drag)
+                : isSignerDrag(shape.drag)
                   ? "border-accent bg-surface"
                   : "border-border bg-surface"
             }`}
           >
             <button
               type="button"
-              onClick={edit.addStep}
+              onClick={shape.addStep}
               className="inline-flex h-8.5 items-center gap-1.5 rounded-md border border-accent bg-accent px-3.5 text-[12.5px] font-semibold text-accent-fg hover:opacity-90"
             >
               <PlusIcon size={15} />
@@ -179,6 +205,42 @@ export function FlowCanvas({
           </div>
         </>
       ) : null}
+    </div>
+  );
+}
+
+/**
+ * Cảnh báo "bước này chưa có ai ký", đặt NGOÀI ô bước.
+ *
+ * Lỗi cấp bước là lỗi không có `slotId` — lỗi của một ô thì chính ô đó đã tự nói
+ * ra rồi, nhắc lại ở đây là báo hai lần cùng một chuyện.
+ */
+function StepIssueNote({
+  t,
+  issues,
+  stepIndex,
+}: {
+  t: Dictionary;
+  issues?: DraftIssue[];
+  stepIndex: number;
+}) {
+  const c = t.signRequest.flow.canvas;
+  const empty = issues?.some(
+    (issue) => issue.stepIndex === stepIndex && !issue.slotId && issue.code === "EMPTY_STEP",
+  );
+
+  if (!empty) return null;
+
+  return (
+    <div
+      role="alert"
+      className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-md border border-warning bg-warning-subtle px-3 py-1.5"
+    >
+      <AlertTriangleIcon size={13} className="shrink-0 text-warning" />
+      <p className="text-[11.5px] font-semibold text-fg">
+        {t.signRequest.review.issue.EMPTY_STEP(stepIndex + 1)}
+      </p>
+      <span className="text-[11.5px] text-fg-muted">{c.emptyStepHint}</span>
     </div>
   );
 }
@@ -207,10 +269,10 @@ function StepLane({
   step,
   index,
   total,
-  signaturesBeforeCount,
   progressState,
   onOpenSlot,
   edit,
+  shape,
   hover,
   slotStatusOf,
 }: {
@@ -222,6 +284,8 @@ function StepLane({
   progressState?: LaneState;
   onOpenSlot: (slotId: string) => void;
   edit?: FlowEditHandlers;
+  /** `edit` khi cấu trúc luồng sửa được; `undefined` với luồng đến từ mẫu. */
+  shape?: FlowEditHandlers;
   hover: HoverState;
   slotStatusOf: (slot: SignatureSlot) => SlotStatus;
 }) {
@@ -229,20 +293,19 @@ function StepLane({
   const p = t.signRequest.progress;
   const number = index + 1;
   const title = step.name.trim() || c.stepLabel(number);
-  const counterSign = index > 0;
   const selected = edit?.selectedStepId === step.id;
   const stepIssues = edit?.issues.filter((issue) => issue.stepIndex === index) ?? [];
-  const droppingSigner = isSignerDrag(edit?.drag) && hover.overStepId === step.id;
-  const droppingStep = edit?.drag?.kind === "step" && hover.overStepId === step.id;
+  const droppingSigner = isSignerDrag(shape?.drag) && hover.overStepId === step.id;
+  const droppingStep = shape?.drag?.kind === "step" && hover.overStepId === step.id;
 
   return (
     <section
       aria-label={title}
       onClick={edit ? () => edit.selectStep(step.id) : undefined}
       onDragOver={
-        edit
+        shape
           ? (event: DragEvent<HTMLElement>) => {
-              const drag = edit.drag;
+              const drag = shape.drag;
 
               if (!drag) return;
 
@@ -275,7 +338,7 @@ function StepLane({
           : undefined
       }
       onDragLeave={
-        edit
+        shape
           ? (event: DragEvent<HTMLElement>) => {
               /*
               * Nếu chỉ đang di chuyển giữa các element con
@@ -295,9 +358,9 @@ function StepLane({
           : undefined
       }
       onDrop={
-        edit
+        shape
           ? (event: DragEvent<HTMLElement>) => {
-              const drag = edit.drag;
+              const drag = shape.drag;
 
               if (!drag) return;
 
@@ -309,8 +372,8 @@ function StepLane({
 
                 event.preventDefault();
 
-                edit.moveStepById(drag.stepId, index);
-                edit.setDrag(undefined);
+                shape.moveStepById(drag.stepId, index);
+                shape.setDrag(undefined);
                 hover.clearHover();
 
                 return;
@@ -326,9 +389,9 @@ function StepLane({
               if (isSignerDrag(drag)) {
                 event.preventDefault();
 
-                edit.dropOnStep(step.id);
+                shape.dropOnStep(step.id);
 
-                edit.setDrag(undefined);
+                shape.setDrag(undefined);
                 hover.clearHover();
               }
             }
@@ -343,16 +406,16 @@ function StepLane({
     >
       {/* ---------- Đầu bước ---------- */}
       <header className="flex flex-wrap items-center gap-x-2.5 gap-y-2 border-b border-border-muted px-3 py-2.5">
-        {edit ? (
+        {shape ? (
           <span
             draggable
             onDragStart={(event) => {
               event.dataTransfer.effectAllowed = "move";
               event.dataTransfer.setData("text/plain", title);
-              edit.setDrag({ kind: "step", stepId: step.id });
+              shape.setDrag({ kind: "step", stepId: step.id });
             }}
             onDragEnd={() => {
-              edit.setDrag(undefined);
+              shape.setDrag(undefined);
               hover.clearHover();
             }}
             title={c.dragStep(number)}
@@ -372,10 +435,10 @@ function StepLane({
           {progressState === "done" ? <CheckIcon size={13} /> : number}
         </span>
 
-        {edit ? (
+        {shape ? (
           <input
             value={step.name}
-            onChange={(event) => edit.patchStep(step.id, { name: event.target.value })}
+            onChange={(event) => shape.patchStep(step.id, { name: event.target.value })}
             placeholder={c.stepNamePlaceholder(number)}
             aria-label={c.renameLabel(number)}
             className="min-w-32 flex-1 rounded-md border border-transparent bg-transparent px-1.5 py-0.5 text-[13.5px] font-semibold text-fg placeholder:font-medium placeholder:text-fg-subtle hover:border-border focus:border-accent focus:bg-canvas focus:outline-none"
@@ -408,25 +471,25 @@ function StepLane({
           </span>
         ) : null}
 
-        {edit ? (
+        {shape ? (
           <div className="flex items-center gap-1">
             <RuleToggle
               t={t}
               rule={step.rule}
               disabled={step.slots.length < 2}
-              onChange={(rule) => edit.patchStep(step.id, { rule })}
+              onChange={(rule) => shape.patchStep(step.id, { rule })}
             />
             <IconButton
               label={c.moveUp(number)}
               disabled={index === 0}
-              onClick={() => edit.moveStep(index, index - 1)}
+              onClick={() => shape.moveStep(index, index - 1)}
             >
               <ChevronUpIcon size={15} />
             </IconButton>
             <IconButton
               label={c.moveDown(number)}
               disabled={index === total - 1}
-              onClick={() => edit.moveStep(index, index + 1)}
+              onClick={() => shape.moveStep(index, index + 1)}
             >
               <ChevronUpIcon size={15} className="rotate-180" />
             </IconButton>
@@ -436,46 +499,58 @@ function StepLane({
               title={total <= 1 ? c.lastStepLocked : undefined}
               disabled={total <= 1}
               danger
-              onClick={() => edit.removeStep(step.id)}
+              onClick={() => shape.removeStep(step.id)}
             >
               <TrashIcon size={15} />
             </IconButton>
           </div>
         ) : null}
+
+        {/* Luồng khoá cấu trúc: nói RÕ vì sao không có nút nào, thay vì để một
+            hàng công cụ biến mất không lời giải thích. */}
+        {edit && !shape ? (
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-inset px-2.5 py-0.5 text-[11px] font-semibold text-fg-muted">
+            <LockIcon size={12} />
+            {c.fromTemplate}
+          </span>
+        ) : null}
       </header>
 
       {/* ---------- Quan hệ với các bước trước ---------- */}
+      {/*
+        Nhiều ô trong một bước = cùng `signingOrder` = KÝ SONG SONG: cả nhóm mở
+        lượt một lúc và bước sau chờ đủ. Nói thẳng ra ở đây, vì nhìn một hàng ô
+        cạnh nhau người soạn dễ đọc thành "ký lần lượt từ trái sang phải".
+      */}
       <p className="flex flex-wrap items-center gap-x-2 gap-y-1 px-3 pt-2 text-[11.5px] text-fg-muted">
-        <span>
-          {/* Bước trên còn trống thì "ký đè lên 0 chữ ký" là một câu vô nghĩa. */}
-          {!counterSign
-            ? c.coSignHint
-            : signaturesBeforeCount === 0
-              ? c.counterSignNothing
-              : c.counterSignHint(signaturesBeforeCount, index)}
-        </span>
         {step.slots.length > 1 ? (
-          <span className="font-mono text-[10.5px] text-fg-subtle">
-            · {step.rule === "ANY" ? c.ruleAnyHint : c.ruleAllHint}
-          </span>
+          <>
+            <span className="inline-flex items-center gap-1 rounded-full bg-accent-subtle px-2 py-0.5 text-[10.5px] font-semibold text-accent">
+              <UsersIcon size={11} />
+              {c.parallelStep(step.slots.length)}
+            </span>
+            <span className="font-mono text-[10.5px] text-fg-subtle">
+              · {step.rule === "ANY" ? c.ruleAnyHint : c.ruleAllHint}
+            </span>
+          </>
         ) : null}
       </p>
 
       {/* ---------- Hàng ô chữ ký ---------- */}
       <ul
         onDragOver={
-          edit
+          shape
             ? (event) => {
-                if (!isSignerDrag(edit.drag)) return;
+                if (!isSignerDrag(shape.drag)) return;
                 event.preventDefault();
                 event.stopPropagation();
-                event.dataTransfer.dropEffect = signerDropEffect(edit.drag);
+                event.dataTransfer.dropEffect = signerDropEffect(shape.drag);
                 hover.setOverStepId(step.id);
               }
             : undefined
         }
         onDragLeave={
-          edit
+          shape
             ? (event) => {
                 if (event.currentTarget.contains(event.relatedTarget as Node | null)) return;
                 hover.setOverStepId(undefined);
@@ -484,13 +559,13 @@ function StepLane({
             : undefined
         }
         onDrop={
-          edit
+          shape
             ? (event) => {
-                if (!isSignerDrag(edit.drag)) return;
+                if (!isSignerDrag(shape.drag)) return;
                 event.preventDefault();
                 event.stopPropagation();
-                edit.dropOnStep(step.id, hover.overSlot?.stepId === step.id ? hover.overSlot.index : undefined);
-                edit.setDrag(undefined);
+                shape.dropOnStep(step.id, hover.overSlot?.stepId === step.id ? hover.overSlot.index : undefined);
+                shape.setDrag(undefined);
                 hover.clearHover();
               }
             : undefined
@@ -508,6 +583,7 @@ function StepLane({
               issue={edit?.issues.find((item) => item.slotId === slot.id)}
               onOpen={() => onOpenSlot(slot.id)}
               edit={edit}
+              shape={shape}
               insertBefore={
                 hover.overSlot?.stepId === step.id && hover.overSlot.index === slotIndex
               }
@@ -516,27 +592,24 @@ function StepLane({
           </li>
         ))}
 
-        {step.slots.length === 0 ? (
-          <li
-            className={`flex min-h-21 flex-1 flex-col items-center justify-center gap-1 rounded-md border-2 border-dashed px-4 py-3 text-center ${
-              stepIssues.some((issue) => issue.code === "EMPTY_STEP")
-                ? "border-warning bg-warning-subtle"
-                : "border-border"
-            }`}
-          >
-            <p className="text-[12px] font-semibold text-fg">{c.emptyStep}</p>
-            {edit ? <p className="text-[11px] text-fg-muted">{c.emptyStepHint}</p> : null}
+        {/* Lúc soạn, bước rỗng được cảnh báo BÊN NGOÀI ô bước (xem `StepIssueNote`):
+            một ô báo lỗi nằm đúng chỗ ô chữ ký sắp xuất hiện thì vừa chiếm chỗ
+            vừa trông như một ô ký hỏng. Màn theo dõi không sửa được gì nên vẫn
+            cần một dòng nói ra bước này rỗng. */}
+        {!edit && step.slots.length === 0 ? (
+          <li className="flex min-h-21 flex-1 items-center justify-center rounded-md border-2 border-dashed border-border px-4 py-3 text-center">
+            <p className="text-[12px] font-semibold text-fg-muted">{c.emptyStep}</p>
           </li>
         ) : null}
 
-        {edit ? (
+        {shape ? (
           <li>
             <button
               type="button"
               onClick={(event) => {
                 event.stopPropagation();
-                edit.selectStep(step.id);
-                edit.addSlot(step.id);
+                shape.selectStep(step.id);
+                shape.addSlot(step.id);
               }}
               className="flex h-full min-h-21 w-33 flex-col items-center justify-center gap-1.5 rounded-md border border-dashed border-border bg-surface-2 px-3 text-fg-muted transition-colors hover:border-accent hover:bg-accent-subtle hover:text-accent"
             >
@@ -561,6 +634,7 @@ function SlotCard({
   issue,
   onOpen,
   edit,
+  shape,
   insertBefore,
   onDragOverCard,
 }: {
@@ -570,6 +644,8 @@ function SlotCard({
   issue?: DraftIssue;
   onOpen: () => void;
   edit?: FlowEditHandlers;
+  /** `edit` khi ô này thêm/bớt/kéo được; `undefined` với ô đến từ mẫu. */
+  shape?: FlowEditHandlers;
   insertBefore: boolean;
   onDragOverCard: () => void;
 }) {
@@ -577,7 +653,11 @@ function SlotCard({
   const signer = slot.signer;
   /* Người ký qua link có thể chưa kịp điền tên — email đã đủ để nhận ra họ. */
   const identity = signer ? signer.name.trim() || signer.email.trim() : "";
-  const name = identity || s.unassigned;
+  /*
+   * Ô trống của một mẫu đã biết mình là chỗ ký của AI — "Kế toán trưởng" nói
+   * nhiều hơn "Chọn người ký" rất nhiều khi luồng có sáu ô.
+   */
+  const name = identity || slot.roleName || s.unassigned;
   const link = signer?.kind === "link";
 
   return (
@@ -591,22 +671,22 @@ function SlotCard({
       />
 
       <div
-        draggable={Boolean(edit && signer)}
+        draggable={Boolean(shape && signer)}
         onDragStart={
-          edit
+          shape
             ? (event) => {
                 event.stopPropagation();
                 event.dataTransfer.effectAllowed = "move";
                 event.dataTransfer.setData("text/plain", name);
-                edit.setDrag({ kind: "slot", slotId: slot.id });
+                shape.setDrag({ kind: "slot", slotId: slot.id });
               }
             : undefined
         }
-        onDragEnd={edit ? () => edit.setDrag(undefined) : undefined}
+        onDragEnd={shape ? () => shape.setDrag(undefined) : undefined}
         onDragOver={
-          edit
+          shape
             ? () => {
-                const current = edit.drag;
+                const current = shape.drag;
                 if (!isSignerDrag(current)) return;
                 // Kéo chính nó thì không có vạch chèn nào cả.
                 if (current?.kind === "slot" && current.slotId === slot.id) return;
@@ -646,19 +726,20 @@ function SlotCard({
                 {name}
               </span>
               <span className="block truncate font-mono text-[10.5px] text-fg-subtle">
-                {signer?.email || (edit ? s.unassignedHint : "—")}
+                {signer?.email ||
+                  (slot.roleName ? s.roleHint : edit ? s.unassignedHint : "—")}
               </span>
             </span>
 
-            {edit && signer ? (
+            {shape && signer ? (
               <span
                 draggable
                 onDragStart={(event) => {
                   event.dataTransfer.effectAllowed = "move";
                   event.dataTransfer.setData("text/plain", name);
-                  edit.setDrag({ kind: "slot", slotId: slot.id });
+                  shape.setDrag({ kind: "slot", slotId: slot.id });
                 }}
-                onDragEnd={() => edit.setDrag(undefined)}
+                onDragEnd={() => shape.setDrag(undefined)}
                 title={s.drag(name)}
                 aria-hidden="true"
                 className="cursor-grab rounded p-0.5 text-fg-subtle opacity-0 transition-opacity group-hover:opacity-100 active:cursor-grabbing"
@@ -677,6 +758,11 @@ function SlotCard({
             ) : (
               <Chip>{s.invisible}</Chip>
             )}
+            {/* Vai của mẫu ký nhiều chỗ trên tài liệu — sơ đồ vẫn vẽ một ô, nên
+                con số này là thứ duy nhất nói ra chuyện đó. */}
+            {slot.slotCount && slot.slotCount > 1 ? (
+              <Chip>{s.slotCount(slot.slotCount)}</Chip>
+            ) : null}
             {link ? (
               <span className="inline-flex items-center gap-1 rounded-sm bg-accent-subtle px-1.5 py-0.5 font-mono text-[10px] font-semibold text-accent">
                 <LinkIcon size={10} />
@@ -694,12 +780,12 @@ function SlotCard({
           ) : null}
         </button>
 
-        {edit ? (
+        {shape ? (
           <button
             type="button"
             onClick={(event) => {
               event.stopPropagation();
-              edit.removeSlot(slot.id);
+              shape.removeSlot(slot.id);
             }}
             aria-label={identity ? s.remove(identity) : s.removeEmpty}
             className="absolute right-1 top-1 flex size-5.5 items-center justify-center rounded text-fg-subtle transition-colors hover:bg-danger-subtle hover:text-danger"

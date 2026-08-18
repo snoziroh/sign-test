@@ -5,6 +5,8 @@ import type { Dictionary } from "@/lib/i18n";
 import type { Phase } from "./verification-config";
 import {
   VerdictIcon,
+  checkTallyBadgeClass,
+  primaryCheckTally,
   verdictMeta,
   formatDateTimeCompact,
   fileExtension,
@@ -157,6 +159,7 @@ export function SignatureList({
           {signatures.map((signature, position) => {
             const selected = position === selectedIndex;
             const meta = verdictMeta(t, signature.status);
+            const tally = primaryCheckTally(signature);
 
             return (
               <button
@@ -182,6 +185,19 @@ export function SignatureList({
                     {formatDateTimeCompact(signature.signingTime)} · {meta.title}
                   </span>
                 </span>
+
+                {tally ? (
+                  <span
+                    title={t.verify.signatureList.checksPassed(tally.passed, tally.total)}
+                    className={`shrink-0 rounded-full px-1.5 py-0.5 font-mono text-[10px] font-semibold tabular-nums ${checkTallyBadgeClass(tally.tone)}`}
+                  >
+                    {tally.passed}/{tally.total}
+                    <span className="sr-only">
+                      {" "}
+                      {t.verify.signatureList.checksPassed(tally.passed, tally.total)}
+                    </span>
+                  </span>
+                ) : null}
 
                 <ChevronRightIcon size={14} className="shrink-0 text-fg-subtle" />
               </button>

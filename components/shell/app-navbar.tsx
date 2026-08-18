@@ -42,9 +42,23 @@ const mobileIconButtonClassName = `
   focus-visible:ring-offset-surface
 `;
 
+/**
+ * Đường dẫn công khai — không được thấy khung nội bộ.
+ *
+ * `/external-sign` mở cho người NGOÀI hệ thống bằng một liên kết ký. Thanh này chở
+ * tên ba màn nghiệp vụ, đường về trang chủ và (qua `PageChrome`) ô địa chỉ dịch vụ
+ * ký: một bản đồ hệ thống mà một liên kết bị chuyển tiếp sẽ mang theo. Trang đó tự
+ * dựng khung riêng ở `ExternalSigningChrome`.
+ */
+const PUBLIC_PATH_PREFIXES = ["/external-sign"] as const;
+
 export function AppNavbar() {
   const pathname = usePathname();
   const { t } = useLocale();
+
+  const isPublicRoute = PUBLIC_PATH_PREFIXES.some(
+    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
+  );
 
   const isHome = pathname === "/";
 
@@ -59,6 +73,10 @@ export function AppNavbar() {
     setNavigationOpen(false);
     setSettingsOpen(false);
   }, [pathname]);
+
+  // Sau mọi hook, không trước: một `return` sớm đặt trên chúng là đổi số hook giữa
+  // hai lần render khi người dùng chuyển sang route công khai.
+  if (isPublicRoute) return null;
 
   return (
     <>

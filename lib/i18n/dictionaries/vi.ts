@@ -764,6 +764,28 @@ export const vi: Dictionary = {
   },
 
   signRequest: {
+    /**
+     * Danh tính người thao tác — giá trị của `X-Username`. Câu chữ ở đây phải
+     * nói rõ nó KHÔNG phải đăng nhập: dịch vụ không xác thực gì cả, nên gõ tên
+     * ai vào cũng được, và đó chính là điều người test cần biết.
+     */
+    actor: {
+      title: "Thao tác dưới tên",
+      description:
+        "Mọi endpoint của quy trình ký đều đòi header X-Username. Dịch vụ ký không có xác thực, nên đây chỉ là cái tên mà yêu cầu được ghi sổ dưới đó — và cũng là cái tên quyết định ai đọc được tài liệu về sau.",
+      label: "Tên người dùng",
+      placeholder: "user123",
+      hint: "Tối đa 128 ký tự. Không có gì được kiểm tra — không tài khoản nào được tạo hay tra cứu.",
+      accessNote:
+        "Tài liệu của một yêu cầu ký chỉ người tạo và những người được chỉ định ký mới đọc được. Đổi tên ở đây là có thể mất quyền xem những yêu cầu đã tạo dưới tên cũ.",
+      buttonTitle: "Đổi tên người thao tác",
+      unset: "Chưa chọn",
+      save: "Lưu",
+      savedTitle: "Đã lưu danh tính",
+      required: "Chọn danh tính trước khi tạo yêu cầu.",
+      requiredHint:
+        "Dùng nút danh tính trên đầu trang. Thiếu X-Username thì dịch vụ từ chối mọi lời gọi của màn này.",
+    },
     steps: {
       navLabel: "Các bước tạo yêu cầu",
       stepOf: (current: number, total: number) => `Bước ${current} / ${total}`,
@@ -776,7 +798,7 @@ export const vi: Dictionary = {
       },
       flow: {
         label: "Luồng ký",
-        description: "Kéo người ký vào từng bước. Trong một bước mọi người ký song song; mỗi bước sau counter-sign toàn bộ chữ ký trước đó.",
+        description: "Thêm người ký vào từng bước. Trong một bước mọi người ký song song; mỗi bước sau sẽ ký trên tài liệu chứa chữ ký của bước trước.",
       },
       review: {
         label: "Xác nhận",
@@ -796,7 +818,7 @@ export const vi: Dictionary = {
       size: "Dung lượng",
       unknownFormat: "Không xác định",
       previewTitle: "Xem trước",
-      previewEmpty: "Chọn một tài liệu để xem ở đây.",
+      previewEmpty: "Tải tài liệu lên để xem ở đây.",
       pdfOnlyPreview: "Màn này chỉ dựng bản xem trước cho PDF — luồng ký chạy y hệt với mọi định dạng được hỗ trợ.",
       boundaryTitle: "Tệp đi đâu",
       boundaryText:
@@ -829,10 +851,12 @@ export const vi: Dictionary = {
         counterSignNothing: "Chưa có chữ ký nào ở các bước trên để ký đè lên.",
         counterSignHint: (count: number, steps: number) =>
           `Ký đè lên ${count} chữ ký của ${steps === 1 ? "bước trước" : `${steps} bước trước`}.`,
+        parallelStep: (n: number) => `${n} chữ ký song song`,
         ruleLabel: "Điều kiện xong",
         ruleAll: "Tất cả",
         ruleAny: "Bất kỳ ai",
-        ruleAllHint: "Mọi người trong bước phải ký thì bước sau mới mở.",
+        ruleAllHint:
+          "Mọi người trong bước ký cùng lúc, và phải đủ chữ ký thì bước sau mới mở.",
         ruleAnyHint: "Một chữ ký là đủ để mở bước sau.",
         moveUp: (index: number) => `Đưa bước ${index} lên trên`,
         moveDown: (index: number) => `Đưa bước ${index} xuống dưới`,
@@ -844,14 +868,17 @@ export const vi: Dictionary = {
         dropIntoStep: "Thả vào đây",
         newStepDrop: "Thả một người vào đây để mở bước mới",
         emptyStep: "Chưa có người ký",
-        emptyStepHint: "Kéo một người từ bên trái vào, hoặc bấm Thêm người ký.",
+        emptyStepHint: "Bấm Thêm người ký để đưa một người vào bước này.",
         signatureCount: (count: number) => `${count} chữ ký`,
         thenLabel: "rồi tới",
+        /* Luồng khoá cấu trúc — nói LÝ DO, không chỉ nói trạng thái. */
+        fromTemplate: "Do mẫu quy định",
       },
 
       slot: {
         unassigned: "Chọn người ký",
         unassignedHint: "Ô này đã giữ chỗ nhưng chưa gán ai.",
+        roleHint: "Chỗ ký của mẫu — chọn người đứng vào.",
         configure: (name: string) => `Cấu hình chữ ký của ${name}`,
         remove: (name: string) => `Bỏ ${name} khỏi bước này`,
         removeEmpty: "Bỏ ô chữ ký trống này",
@@ -861,6 +888,7 @@ export const vi: Dictionary = {
         invisible: "Ẩn",
         pageLabel: (page: number) => `Trang ${page}`,
         incomplete: "Còn thiếu",
+        slotCount: (count: number) => `${count} khung`,
       },
 
       summary: {
@@ -927,6 +955,10 @@ export const vi: Dictionary = {
       pageOf: (current: number, total: number) => `Trang ${current} / ${total}`,
       previousPage: "Trang trước",
       nextPage: "Trang sau",
+      currentPage: "Trang hiện tại",
+      zoomOut: "Thu nhỏ",
+      zoomIn: "Phóng to",
+      fitWidth: "Vừa chiều rộng",
       otherSignerBox: (name: string) => `${name} — cùng trang`,
       renderFailed: (error: string) => `Không hiển thị được PDF: ${error}`,
     },
@@ -959,11 +991,17 @@ export const vi: Dictionary = {
         LINK_WITHOUT_EMAIL: (index: number) => `Một người ký qua link ở bước ${index} chưa có email.`,
         DUPLICATE_IN_STEP: (index: number, name: string) =>
           `${name} xuất hiện hai lần trong bước ${index}. Hai chữ ký song song của cùng một người không thêm giá trị nào.`,
+        MISSING_VARIABLE: (label: string) => `Chưa điền “${label}”.`,
       },
       goToStep: (index: number) => `Tới bước ${index}`,
       submit: "Tạo yêu cầu ký",
       submitting: "Đang tạo…",
       backToFlow: "Quay lại luồng ký",
+      submitFailed: "Chưa tạo được yêu cầu ký",
+      retryNote:
+        "Bấm lại vẫn dùng đúng khoá idempotency cũ, nên một yêu cầu thật ra đã được tạo sẽ được trả về chứ không bị nhân đôi.",
+      localOnlyNote:
+        "Chỉ tên yêu cầu, tài liệu và danh sách người ký được gửi lên dịch vụ. Hạn ký, lời nhắn và hai công tắc phía trên không có trường nào trong API — chúng ở lại trình duyệt này và mất khi tải lại trang.",
     },
 
     progress: {
@@ -992,8 +1030,6 @@ export const vi: Dictionary = {
         declined: "Đã từ chối",
       },
       signedAt: (value: string) => `Ký lúc ${value}`,
-      copyLink: "Sao chép link ký",
-      linkCopied: "Đã sao chép link ký",
       download: "Tải tài liệu",
       cancelRequest: "Huỷ yêu cầu",
       newRequest: "Tạo yêu cầu mới",
@@ -1004,11 +1040,900 @@ export const vi: Dictionary = {
       timelineCompleted: "Đã thu đủ chữ ký",
       timelineWaiting: (name: string) => `Đang chờ ${name}`,
 
-      demoTitle: "Điều khiển bản dựng",
-      demoHint: "Màn này chưa nối vào dịch vụ ký nào. Mấy nút dưới đây đẩy luồng chạy tiếp để xem được các trạng thái.",
-      demoSign: "Mô phỏng chữ ký tiếp theo",
-      demoReset: "Đặt lại tiến trình",
-      demoDone: "Không còn gì để ký",
+      refresh: "Làm mới",
+      refreshFailed: "Không đọc được trạng thái mới nhất",
+      downloadFailed: "Không tải được tài liệu",
+      previewWarnings: "Cảnh báo lúc dựng tài liệu",
+      linkIssuedInDetail:
+        "Link ký được phát cho từng người ký ở màn chi tiết quy trình — đó là chỗ duy nhất có mã người ký mà dịch vụ cần.",
+      linkOpenDetail: "Quản lý link ký",
+      localOnlyTitle: "Không lưu trên máy chủ",
+      localOnlyHint:
+        "Hạn ký, lời nhắn, công tắc nhắc nhở, luật hoàn tất của bước và cấu hình ký của từng ô đều không có trường nào trong API tạo yêu cầu. Chúng hiện ra từ bộ nhớ của trình duyệt này và mất khi tải lại trang — chữ ký và trạng thái thì đến từ dịch vụ.",
+    },
+
+    /**
+     * Danh sách quy trình đã tạo và màn chi tiết mở từ đó.
+     *
+     * Khác `progress` ở LỐI VÀO chứ không ở nội dung: `progress` là màn hiện ra
+     * ngay sau khi tạo yêu cầu, còn phần này là đường quay lại nó về sau — kể cả
+     * từ một máy khác, kể cả bởi người ký chứ không phải người tạo. Câu chữ vì
+     * thế phải đứng được một mình, không nhắc tới "vừa xong".
+     */
+    workflows: {
+      tabs: {
+        label: "Các phần của màn yêu cầu ký",
+        list: "Quy trình",
+        create: "Tạo yêu cầu",
+      },
+
+      list: {
+        title: "Quy trình ký",
+        description:
+          "Những yêu cầu bạn tạo và những yêu cầu bạn được chỉ định ký. Dịch vụ chọn ra chúng bằng cách đọc X-Username, không bằng gì khác.",
+        refresh: "Làm mới",
+        create: "Tạo yêu cầu",
+        searchLabel: "Tìm quy trình",
+        searchPlaceholder: "Tìm theo tiêu đề",
+        statusLabel: "Trạng thái",
+        relationLabel: "Phần của tôi",
+        allStatuses: "Mọi trạng thái",
+        allRelations: "Tất cả",
+        status: {
+          DRAFT: "Nháp",
+          IN_PROGRESS: "Đang chạy",
+          COMPLETED: "Đã hoàn tất",
+          CANCELLED: "Đã huỷ",
+        },
+        relation: {
+          CREATOR: "Tôi tạo",
+          SIGNER: "Tôi ký",
+          CREATOR_AND_SIGNER: "Tôi tạo và ký",
+        },
+        source: {
+          TEMPLATE_PREVIEW: "Từ mẫu",
+          UPLOADED_DOCUMENT: "Tệp tải lên",
+        },
+        createdBy: (name: string) => `bởi ${name}`,
+        createdAt: (value: string) => `Tạo ${value}`,
+        updatedAt: (value: string) => `Cập nhật ${value}`,
+        count: (total: number) => `${total} quy trình`,
+        pageOf: (page: number, total: number) => `Trang ${page}/${total}`,
+        prev: "Trước",
+        next: "Sau",
+        empty: "Chưa có quy trình nào",
+        emptyHint:
+          "Yêu cầu bạn tạo, và yêu cầu có người chỉ định bạn ký, sẽ hiện ở đây. Bắt đầu một cái ở thẻ Tạo yêu cầu.",
+        noResults: "Không quy trình nào khớp bộ lọc.",
+        noResultsHint:
+          "Tìm kiếm và trạng thái do dịch vụ xử lý; “phần của tôi” chỉ lọc trong trang đang xem, vì API không có tham số cho nó.",
+        relationFilterNote: "Chỉ lọc trong trang này — API không có tham số cho nó.",
+        loadFailed: "Không tải được danh sách quy trình",
+        retry: "Thử lại",
+        actorRequired: "Chọn danh tính trước",
+        actorRequiredHint:
+          "Danh sách được dựng từ header X-Username — dịch vụ không có cách nào khác để biết phải trả về quy trình của ai. Dùng nút danh tính trên thanh tiêu đề.",
+        open: "Mở",
+      },
+
+      detail: {
+        back: "Tất cả quy trình",
+        loading: "Đang mở quy trình…",
+        loadFailed: "Không mở được quy trình này",
+        loadFailedHint:
+          "Một yêu cầu chỉ người tạo và những người được chỉ định ký mới đọc được. Kiểm tra danh tính trên thanh tiêu đề trước khi kết luận là yêu cầu không còn.",
+        serverOnlyTitle: "Dựng lại từ dịch vụ",
+        serverOnlyHint:
+          "Tên bước, luật hoàn tất, hạn ký và cấu hình ký của từng ô chưa bao giờ được gửi lên dịch vụ, nên chúng không hiện ở đây. Mọi thứ trên màn này đến từ GET /api/signing-requests/{id}.",
+
+        assignment: {
+          title: "Phần của bạn",
+          none: "Bạn không phải người ký trong quy trình này.",
+          noneHint: "Nó hiện ra vì bạn là người tạo.",
+          stepLabel: (index: number) => `Bước ${index}`,
+          waiting: "Đang chờ chữ ký của bạn",
+          notYourTurn: "Một bước trước đó chưa ký xong.",
+          signed: (value: string) => `Bạn đã ký ${value}`,
+          declined: "Bạn đã từ chối quy trình này.",
+          sign: "Ký ngay",
+          signFailed: "Không giành được quyền ký",
+          decline: "Từ chối",
+          lockedTitle: "Đang có người khác ký",
+          lockedBody: "Chờ lượt ký đó hoàn tất thì bạn mới ký được.",
+          lockedByBody: (holder: string) =>
+            `${holder} đang ký. Chờ lượt ký đó hoàn tất thì bạn mới ký được.`,
+        },
+
+        cancel: "Huỷ quy trình",
+        remind: "Gửi nhắc nhở",
+        cancelConfirmTitle: "Huỷ quy trình này?",
+        cancelConfirmBody:
+          "Thao tác này dừng quy trình cho tất cả mọi người. Người ký chưa ký sẽ không ký được nữa, và không thể hoàn tác.",
+        cancelConfirmAction: "Huỷ quy trình",
+        cancelConfirmDismiss: "Giữ nguyên",
+        cancelDone: "Đã huỷ quy trình",
+        cancelFailed: "Không huỷ được quy trình",
+
+        declineConfirmTitle: "Từ chối ký?",
+        declineConfirmBody:
+          "Thao tác này dừng cả quy trình cho tất cả mọi người, không chỉ phần của bạn, và không thể hoàn tác.",
+        declineConfirmAction: "Từ chối",
+        declineConfirmDismiss: "Giữ nguyên chờ ký",
+        declineDone: "Đã từ chối",
+        declineFailed: "Không từ chối được",
+
+        links: {
+          title: "Link ký ngoài hệ thống",
+          intro:
+            "Mỗi người ký một link, dành cho người không có tài khoản. Một link chỉ ký được đúng một chữ ký và chỉ dùng được bởi người ký nó được phát cho.",
+          loading: "Đang đọc danh sách link…",
+          noLink: "Chưa phát link nào",
+          order: (position: number) => `Người ký thứ ${position}`,
+          tokenHintLabel: "Mã nhận dạng link",
+
+          signerTurn: "Đang tới lượt — phát link được ngay.",
+          signerWaiting: "Còn người ký trước chưa xong.",
+          signerSigned: "Đã ký.",
+          signerDeclined: "Đã từ chối ký.",
+
+          status: {
+            ACTIVE: "Đang hoạt động",
+            EXPIRED: "Đã hết hạn",
+            REVOKED: "Đã thu hồi",
+            CONSUMED: "Đã dùng",
+          },
+          expiresAt: (value: string) => `Hết hạn ${value}`,
+          expiredAt: (value: string) => `Hết hạn từ ${value}`,
+          revokedAt: (value: string) => `Thu hồi lúc ${value}`,
+          consumedAt: (value: string) => `Đã ký lúc ${value}`,
+
+          create: "Tạo link",
+          recreate: "Tạo link mới",
+          revoke: "Thu hồi",
+          copy: "Sao chép link",
+          hideUrl: "Ẩn",
+          history: (count: number) => `${count} link trước đó`,
+
+          createTitle: "Tạo link ký",
+          createConfirm: "Tạo link",
+          recreateTitle: "Tạo link ký mới",
+          recreateConfirm: "Thay link hiện tại",
+          recreateWarning:
+            "Tạo link mới sẽ làm link đang hoạt động mất hiệu lực. Nếu bạn đã gửi link đó đi, người nhận sẽ phải dùng link mới.",
+          expiryLabel: "Thời hạn",
+          expiry: {
+            default: "Mặc định của hệ thống",
+            h24: "24 giờ",
+            d3: "3 ngày",
+            d7: "7 ngày",
+          },
+          expiryHint:
+            "Hạn càng ngắn càng an toàn: ai giữ link cũng ký được thay người ký này cho tới khi link hết hạn.",
+
+          freshTitle: "Link — chỉ hiện một lần",
+          foreignDomain: (origin: string) =>
+            `Link trỏ tới ${origin} — đó là domain mà dịch vụ ký được cấu hình để phát trang ký công khai. Hãy chắc địa chỉ đó thật sự phục vụ trang ký trước khi gửi đi.`,
+          freshHint:
+            "Đường dẫn này không được lưu ở đâu và không hiện lại được. Hãy sao chép và gửi cho người ký ngay; nếu mất, phải tạo link mới.",
+
+          copyFailed: "Không sao chép được",
+          copyFailedHint:
+            "Trình duyệt chặn quyền truy cập clipboard. Hãy chọn đường dẫn ở trên và sao chép bằng tay.",
+          createFailed: "Không tạo được link",
+          createdWithoutUrl: "Link đã tạo nhưng không có đường dẫn",
+          createdWithoutUrlHint:
+            "Dịch vụ tạo được link nhưng không trả về URL, nên không có gì để gửi đi. Kiểm tra phản hồi của API tạo link trước khi tạo thêm.",
+          revoked: "Đã thu hồi link",
+          revokedHint: "Link không còn ký được nữa. Tạo link mới nếu người ký vẫn cần.",
+          revokeFailed: "Không thu hồi được link",
+          loadFailed: "Không đọc được danh sách link",
+
+          blockedRequestClosed: "Quy trình đã đóng nên không phát thêm link được.",
+          blockedSigned: "Người này đã ký xong.",
+          blockedDeclined: "Người này đã từ chối, link phát ra cũng không dùng được.",
+          blockedNotTurn:
+            "Chưa tới lượt người này. Dịch vụ từ chối phát link cho người chưa ký được — hãy phát sau khi các bước trước hoàn tất.",
+
+          endpointMissing: "Dịch vụ này không có endpoint quản trị link",
+          endpointMissingHint:
+            "GET/POST /api/signing-requests/{id}/signers/{signerId}/public-links và endpoint thu hồi của nó trả về 404. Trỏ trang sang một dịch vụ có chúng, hoặc bật bản dựng bên dưới để xem giao diện.",
+
+          previewToggle: "Bản dựng — link giả",
+          previewToggleHint:
+            "Đổ vào khối này những link chỉ sống trong bộ nhớ trang. Dùng nó để xem hai trạng thái hết hạn và đã dùng — link thật chỉ tới đó sau khi hết hạn hoặc có người ký. Không có gì được gửi đi và không có gì sống qua lần tải lại trang.",
+          previewConsume: "Giả lập: người ký đã ký",
+          previewExpire: "Giả lập: link hết hạn",
+        },
+
+        /**
+         * Thao tác chưa có endpoint. Nói ra ĐÚNG endpoint còn thiếu và đúng chỗ
+         * phải sửa: người test bàn thử này cũng là người sẽ nối API vào.
+         */
+        missing: {
+          title: "Thao tác này chưa có endpoint",
+          remind:
+            "Dịch vụ không gửi thông báo nào cả. Điền ENDPOINTS.remind trong features/sign-request/workflow-actions.ts khi endpoint đó có.",
+        },
+      },
+
+      /**
+       * Trang ký một ô của quy trình — `/sign-request/workflows/{id}/sign`.
+       *
+       * Nhánh riêng chứ không nằm trong `detail` nữa: nó là câu chữ của MỘT
+       * TRANG, và trang đó có những thứ một hộp thoại chưa từng có (thanh tiến
+       * trình, màn chặn, khối tài liệu). Người đọc là người ký NỘI BỘ nên câu
+       * chữ được phép nói về quy trình và người soạn — khác `externalSign.*`,
+       * nơi người đọc là khách.
+       */
+      sign: {
+        title: "Ký phần của bạn",
+        subtitle: (signer: string, document: string) => `${signer} · ${document}`,
+        back: "Về quy trình",
+
+        loading: "Đang mở lượt ký của bạn…",
+        loadFailed: "Không mở được lượt ký này",
+        retry: "Thử lại",
+
+        steps: {
+          navLabel: "Các bước ký",
+          stepOf: (current: number, total: number) => `Bước ${current}/${total}`,
+          lockedHint: "Xong các bước trước thì bước này mới mở.",
+          review: {
+            label: "Đọc",
+            title: "Đọc tài liệu",
+            description:
+              "Đây là bản bạn sắp ký. Những người ở bước sau sẽ ký chồng lên chính bản này.",
+          },
+          method: {
+            label: "Cách ký",
+            title: "Cách ký",
+            description: "Chọn đúng loại chứng thư bạn đang có trong tay.",
+          },
+          credential: {
+            label: "Thông tin",
+            title: "Thông tin chứng thư",
+            description: "Thứ mà cách ký vừa chọn cần, trước khi nó chạm được tới khoá riêng.",
+          },
+          sign: {
+            label: "Ký",
+            title: "Ký tài liệu",
+            description: "Xem lại một lượt, rồi ký.",
+          },
+        },
+
+        consent: {
+          checkbox: "Tôi đã đọc tài liệu này và đồng ý ký",
+          hint:
+            "Chữ ký của bạn được áp vào đúng bản đang hiện ở bên trái, và được ghi nhận theo tên đăng nhập của bạn.",
+          scrollNote: "Đọc hết tài liệu trước khi ký — ký rồi thì không rút lại được ở màn này.",
+        },
+
+        summary: {
+          title: "Bạn đang ký cái gì",
+          documentLabel: "Tài liệu",
+          signerLabel: "Ký với tư cách",
+          stepLabel: "Bước",
+          step: (index: number) => `Bước ${index}`,
+          statusPending: "Đang chờ chữ ký của bạn",
+          statusSigned: "Đã ký",
+          statusDeclined: "Đã từ chối",
+          checksumLabel: "Mã kiểm tra tài liệu",
+          checksumHint:
+            "Đối chiếu với mã hiện trên màn quy trình để chắc đây đúng là tệp đó.",
+        },
+
+        planTitle: "Chỗ bạn sẽ ký",
+        planLoading: "Đang đọc vị trí chữ ký…",
+        planSummary: (count: number, pages: number[]) =>
+          `${count} ô chữ ký · trang ${pages.join(", ")}`,
+        planEmpty: "Quy trình không đặt ô chữ ký nào cho bạn.",
+        planHint:
+          "Vị trí do quy trình quyết định, không sửa được ở đây. Dịch vụ đọc lại chúng lúc ký.",
+        planFailed: "Không đọc được vị trí chữ ký",
+        planRetry: "Thử lại",
+
+        capabilitiesLoading: "Đang đọc các cách ký khả dụng…",
+        capabilitiesFailed: "Không đọc được các cách ký",
+
+        methodTitle: "Cách ký",
+        methodNote:
+          "Đây là những nguồn chữ ký dịch vụ đang bật, cộng thêm USB Token. Chọn USB Token thì FPT-CA Signing Agent phải đang chạy trên chính máy này.",
+        credentialTitle: "Thông tin chứng thư",
+
+        sourceLabel: "Nguồn chữ ký",
+        algorithmLabel: "Thuật toán",
+        baselineLabel: "Mức baseline",
+
+        action: {
+          needConsent: "Xác nhận bạn đã đọc tài liệu trước đã.",
+          needMethod: "Chọn cách bạn muốn ký.",
+          needFields: "Điền nốt thứ mà cách ký vừa chọn cần.",
+          reloadingDocument: "Đang chờ bản tài liệu mới…",
+        },
+
+        sign: "Ký tài liệu",
+        signing: "Đang ký…",
+
+        failedTitle: "Ký không thành công",
+
+        staleTitle: "Tài liệu vừa thay đổi",
+        staleBody:
+          "Một người cùng bước đã ký xong trước bạn, nên bản tài liệu đã khác. Chưa có gì của bạn bị mất — bấm ký lại là được.",
+
+        resumeTitle: "Đang có một lượt ký chưa xong",
+        resumeBody:
+          "Lượt ký trước của bạn vẫn mở ở dịch vụ ký (thường là do tải lại trang giữa chừng). Hãy tiếp tục lượt đó thay vì bắt đầu lại — bắt đầu lại chỉ nhận về đúng thông báo này.",
+        resumeUsbBody:
+          "Bạn còn một lượt ký đang mở ở dịch vụ ký, và dịch vụ chỉ cho mở một lượt mỗi lần. Lượt ký bằng USB Token thì không nối lại được từ đây: hãy ký nốt ở tab đã bắt đầu nó, hoặc chờ phiên đó hết hạn (15 phút) rồi ký lại từ đầu.",
+        resume: "Tiếp tục lượt ký",
+
+        signedTitle: "Đã ký xong",
+        signedBody:
+          "Chữ ký của bạn đã được ghi vào tài liệu của quy trình. Những người ở bước sau sẽ ký trên bản này.",
+
+        /** Màn chặn — mỗi lý do một câu trả lời khác nhau. */
+        blocked: {
+          title: "Bạn chưa ký được lúc này",
+          NOT_A_SIGNER: {
+            title: "Bạn không phải người ký trong quy trình này",
+            body:
+              "Lượt ký này của người khác, hoặc danh tính trên thanh tiêu đề không phải danh tính mà quy trình đã chỉ định. Kiểm tra danh tính trước khi kết luận là có gì đó sai.",
+          },
+          SIGNER_NOT_FOUND: {
+            title: "Lượt ký đó không tồn tại",
+            body:
+              "Đường dẫn mang theo một người ký mà quy trình này không có. Hãy mở quy trình rồi bấm nút Ký ngay ở khối “Phần của bạn”.",
+          },
+          SIGNER_MISSING: {
+            title: "Đường dẫn không nói rõ phải ký ô nào",
+            body:
+              "Một người có thể đứng ở hai bước khác nhau trong cùng một quy trình, nên trang này cần biết bạn định ký lượt nào. Hãy mở quy trình rồi bấm nút Ký ngay ở khối “Phần của bạn”.",
+          },
+          NOT_YOUR_TURN: {
+            title: "Một bước trước đó chưa ký xong",
+            body:
+              "Quy trình ký theo CẤP: bạn ký được khi mọi người bắt buộc ở các cấp trước đã xong. Từ giờ tới lúc đó bạn không phải làm gì cả.",
+          },
+          ALREADY_SIGNED: {
+            title: "Bạn đã ký phần này rồi",
+            body: "Chữ ký của bạn đã nằm trong tài liệu. Ở đây không còn việc gì nữa.",
+          },
+          DECLINED: {
+            title: "Bạn đã từ chối quy trình này",
+            body: "Việc từ chối không rút lại được từ màn này.",
+          },
+          REQUEST_CANCELLED: {
+            title: "Quy trình này đã bị huỷ",
+            body: "Quy trình đã huỷ thì không ai ký được nữa, tới lượt ai cũng vậy.",
+          },
+          REQUEST_COMPLETED: {
+            title: "Quy trình này đã hoàn tất",
+            body: "Mọi người đã ký xong. Tài liệu hoàn chỉnh nằm ở màn quy trình.",
+          },
+          LEASE_TOKEN_MISSING: {
+            title: "Phiên ký này không hợp lệ",
+            body: "Trang này không được mở qua nút Ký ngay ở màn quy trình, hoặc phiên đã hết hạn. Quay lại và bấm Ký ngay lại từ đầu.",
+          },
+        },
+      },
+    },
+
+    template: {
+      signatureCount: (count: number) => `${count} chữ ký`,
+      stepCount: (count: number) => `${count} bước`,
+      variableCount: (count: number) => `${count} ô cần điền`,
+
+      source: {
+        label: "Tài liệu lấy từ đâu",
+        uploadTab: "Tải tệp lên",
+        templateTab: "Dùng mẫu",
+      },
+
+      picker: {
+        title: "Mẫu có sẵn",
+        detailTitle: "Chi tiết mẫu",
+        detailEmpty: "Chọn một mẫu để xem luồng ký và các ô phải điền của nó.",
+        searchPlaceholder: "Tìm mẫu",
+        refresh: "Tải lại",
+        create: "Tạo mẫu",
+        edit: "Sửa",
+        duplicate: "Nhân bản",
+        delete: "Xoá",
+        confirmDelete: (name: string) => `Xoá “${name}”? Không khôi phục lại được.`,
+        loadFailed: "Không tải được danh sách mẫu",
+        version: (versionNo: number) => `b${versionNo}`,
+        publishedNote:
+          "Mẫu được soạn bên dịch vụ: tải tệp lên, cấu hình các ô phải điền và các vai ký, rồi publish một phiên bản. Màn này dùng bản đã publish — số chỗ ký, thứ tự bước và vị trí khung chữ ký lấy từ đó và không sửa được ở đây.",
+        previewUnavailable: "Mẫu này chưa dựng được bản xem trước.",
+        empty: "Chưa có mẫu nào đang phục vụ",
+        emptyHint:
+          "Một mẫu chỉ hiện ở đây sau khi có ít nhất một phiên bản được publish. Tải tài liệu lên và publish bên dịch vụ, rồi tải lại danh sách.",
+        noResults: "Không có mẫu nào khớp.",
+        untitled: "Mẫu chưa đặt tên",
+        noDescription: "Chưa có mô tả.",
+        builtIn: "Dựng sẵn",
+        unnamedRole: "Chỗ ký chưa đặt tên",
+        flowSection: "Luồng ký",
+        variablesSection: "Các ô phải điền",
+        noVariables: "Mẫu này không có ô nào phải điền.",
+        deadlineNote: (days: number) => `Hạn ký đặt sau ngày tạo yêu cầu ${days} ngày.`,
+        applied: (name: string) => `Đã áp mẫu: ${name}`,
+        appliedBody: (signatures: number, variables: number) =>
+          `${signatures} chỗ ký và ${variables} ô cần điền đã sẵn. Chọn ai đứng vào từng vai — bản thân các vai thì do mẫu chốt.`,
+        detached: "Đã bỏ mẫu — luồng ký dựng lại từ đầu, vì vai của mẫu không gửi kèm một tệp tự tải lên được.",
+      },
+
+      variables: {
+        label: "Điền thông tin",
+        description:
+          "Điền những chỗ trống mà mẫu để lại. Giá trị đi thẳng vào tài liệu, nên mọi người ký lên đúng bản đã hoàn chỉnh.",
+        title: "Thông tin trong tài liệu",
+        progress: (filled: number, total: number) => `Đã điền ${filled}/${total}`,
+        stillRequired: (count: number) => `còn ${count} ô bắt buộc`,
+        required: "Bắt buộc",
+        optional: "không bắt buộc",
+        reset: "Xoá hết",
+        noVariables: "Mẫu này không có ô nào phải điền. Sang bước sau để xếp người ký.",
+        selectPlaceholder: "— Chọn —",
+        unfilled: "chưa điền",
+        previewTitle: "Xem trước",
+        previewEmpty: "Không mở được tài liệu của mẫu.",
+        previewUnreadable:
+          "Không đọc được phần chữ của tệp này nên không dựng được bản xem trước. Giá trị vừa điền vẫn được ghi kèm yêu cầu.",
+        serverRenderNote:
+          "Đây là bản xem trước TRỐNG của mẫu, giá trị vừa gõ được vẽ chồng lên chỗ trống. Tài liệu thật do dịch vụ dựng lúc tạo yêu cầu — bản đó mới là thứ mọi người ký.",
+      },
+
+      review: {
+        section: "Dựng từ mẫu",
+        edit: "Sửa thông tin",
+        goToVariables: "Tới ô điền",
+      },
+
+      builder: {
+        titleCreate: "Tạo template",
+        titleEdit: "Chỉnh sửa template",
+        headingCreate: "Tạo template mới",
+        headingEdit: "Chỉnh sửa template",
+        serverDraft: (versionNo: number) => `BẢN NHÁP V${versionNo} TRÊN MÁY CHỦ`,
+        introMetadataOnly:
+          "Bản đã publish là bất biến. Ở đây chỉ đổi được tên và mô tả của mẫu.",
+        intro:
+          "Tải tài liệu, xác nhận biến, cấu hình luồng ký và kiểm tra bản PDF trước khi publish.",
+        openFullscreen: "Preview toàn màn hình",
+        fallbackName: "Template",
+        fallbackPreviewTitle: "Preview template",
+        fieldPreviewTitle: (name: string) => `Preview biến · ${name}`,
+        noDocumentTitle: "Chưa có tài liệu",
+        noDocumentBody: "Quay lại bước 1 và tải tài liệu nguồn.",
+
+        stepper: {
+          navLabel: "Các bước tạo template",
+          document: { label: "Tài liệu", caption: "Upload & detect" },
+          variables: { label: "Biến dữ liệu", caption: "Xác nhận & preview" },
+          signatures: { label: "Chữ ký", caption: "Workflow & vị trí" },
+          review: { label: "Kiểm tra", caption: "Preview & lưu" },
+        },
+
+        actions: {
+          saveChanges: "Lưu thay đổi",
+          back: "Quay lại",
+          saveDraft: "Lưu bản nháp",
+          submitDocument: "Nộp tài liệu",
+          continue: "Tiếp tục",
+          publish: "Publish mẫu",
+        },
+
+        hint: {
+          metadataLocked: "Mẫu đã rời trạng thái nháp — máy chủ không cho sửa gì thêm.",
+          metadataEditable: "Đổi tên hoặc mô tả rồi bấm Lưu thay đổi.",
+          documentPending:
+            "Nhập mã, tên rồi chọn tệp. Bản nháp chỉ được tạo khi bấm Nộp tài liệu.",
+          documentReady: (fields: number, pages: number) =>
+            `Máy chủ đã dò được ${fields} biến trên ${pages} trang.`,
+          variables: (count: number) =>
+            `Đang cấu hình ${count} biến. Khoá biến do máy chủ đọc từ tệp, không sửa được.`,
+          signatures: (roles: number, steps: number) =>
+            `${roles} chữ ký trong ${steps} bước. Vị trí được lưu khi sang bước sau.`,
+          reviewDirty: "Còn thay đổi chưa lưu — Publish sẽ tự lưu chúng trước.",
+          reviewClean: "Kiểm tra lần cuối rồi Publish để chuyển mẫu sang ACTIVE.",
+        },
+
+        error: {
+          fileType: (extensions: string) =>
+            `Chỉ nhận ${extensions}. Máy chủ không đọc được định dạng khác ở bước tạo mẫu.`,
+          fileTooLarge: (size: string) => `Tệp vượt quá dung lượng cho phép (${size}).`,
+          createDraft: "Không tạo được bản nháp mẫu trên máy chủ.",
+          preview: (variant: string) => `Không tải được bản PDF ${variant}.`,
+          saveFields: "Không lưu được cấu hình biến.",
+          saveSigners: "Không lưu được vai ký và vị trí chữ ký.",
+          saveMetadata: "Không cập nhật được tên và mô tả.",
+          publish: "Không publish được mẫu.",
+        },
+
+        document: {
+          identityEyebrow: "01 · THÔNG TIN TEMPLATE",
+          identityTitle: "Thông tin nhận diện",
+          identityDescription:
+            "Các thông tin dùng trong danh sách template và khi tạo yêu cầu ký từ template.",
+          codeLabel: "Mã template",
+          codeHint: "Bắt đầu bằng chữ hoặc số; chỉ chứa chữ, số, gạch dưới, gạch nối.",
+          codePlaceholder: "HD_LAO_DONG",
+          statusLabel: "Trạng thái",
+          statusHint: "Do máy chủ quyết định — publish mới chuyển sang ACTIVE.",
+          nameLabel: "Tên template",
+          namePlaceholder: "Hợp đồng lao động",
+          namePickFileFirst: "Chọn tài liệu trước để mở ô tên và mô tả.",
+          descriptionLabel: "Mô tả",
+          descriptionHint: "Không bắt buộc. Nên mô tả ngắn mục đích sử dụng.",
+          lockedNote:
+            "Bản nháp đã được tạo trên máy chủ nên mã, tên và mô tả khoá lại ở bước này. Đổi tên hay mô tả là một thao tác riêng sau khi mẫu đã lưu.",
+          sourceEyebrow: "02 · TÀI LIỆU NGUỒN",
+          sourceTitle: "Tải tài liệu và nhận diện biến",
+          sourceDescription:
+            "Backend sẽ đọc DOCX/XLSX, tìm các biến dạng {{variable}} và chuẩn bị PDF preview.",
+          dropzone: "Chọn hoặc kéo thả tài liệu vào đây",
+          dropzoneHint: (size: string) =>
+            `Chỉ DOCX và XLSX, tối đa ${size}. Máy chủ là nguồn sự thật cho danh sách biến và bản PDF preview.`,
+          replaceFile: "Thay tài liệu",
+          metricFields: "Biến phát hiện",
+          metricPages: "Số trang PDF",
+          metricVersion: "Version ID",
+          analysisBusyStrong: "Đang nộp tài liệu:",
+          analysisBusy:
+            "máy chủ dò biến và chuyển sang PDF. Việc này có thể mất vài chục giây với tệp nặng.",
+          analysisDoneStrong: "Bản nháp đã tạo trên máy chủ.",
+          analysisDone: (count: number) => `Nhận được ${count} biến.`,
+          analysisPending:
+            "Tệp mới chỉ nằm ở trình duyệt. Bấm “Nộp tài liệu” để máy chủ đọc biến và dựng PDF — bản nháp chỉ tồn tại từ lúc đó.",
+        },
+
+        variables: {
+          title: "Biến trong tài liệu",
+          description:
+            "Key được backend detect và không chỉnh sửa tại đây. Bạn chỉ cấu hình cách nhập dữ liệu.",
+          count: (n: number) => `${n} biến`,
+          none: "Không phát hiện biến dạng {{variable}} trong tài liệu.",
+          occurrences: (n: number) => `${n} vị trí`,
+          keyLocked: "Key do backend detect",
+          labelLabel: "Tên hiển thị",
+          labelPlaceholder: "Số hợp đồng",
+          typeLabel: "Kiểu dữ liệu",
+          optionsLabel: "Các lựa chọn",
+          optionsHint: "Phân cách bằng dấu phẩy.",
+          defaultLabel: "Giá trị mặc định",
+          hintLabel: "Gợi ý nhập",
+          requiredLabel: "Bắt buộc nhập khi tạo yêu cầu ký",
+          previewTitle: "Preview biến",
+          previewSubtitle: "Các biến được highlight trong PDF do backend render.",
+        },
+
+        signatures: {
+          flowTitle: "Luồng ký",
+          flowDescription:
+            "Chọn một chữ ký để chỉnh cấu hình và đặt vị trí trên tài liệu bên phải.",
+          roleCount: (n: number) => `${n} chữ ký`,
+          flowNotice:
+            "Các bước chạy lần lượt từ trên xuống. Nhiều chữ ký trong CÙNG một bước thì ký song song: cùng mở lượt một lúc, và bước sau chờ tất cả họ ký xong.",
+          stepNamePlaceholder: (n: number) => `Bước ký ${n}`,
+          parallelStep: (n: number) => `${n} chữ ký song song`,
+          moveStepUp: "Chuyển bước lên",
+          moveStepDown: "Chuyển bước xuống",
+          deleteStep: "Xóa bước",
+          addRole: "Thêm chữ ký cho bước này",
+          addParallelRole: "Thêm chữ ký song song",
+          addStep: "Thêm bước ký",
+          positionTitleEmpty: "Chọn một chữ ký để đặt vị trí",
+          positionHint:
+            "Kéo/thay đổi kích thước khung ký trên PDF. Các khung khác hiển thị ở dạng tham chiếu.",
+          reloadPdf: "Tải lại PDF",
+          loadingPlain: "Đang tạo PDF để đặt vị trí chữ ký…",
+          previewFailedTitle: "Không tạo được preview",
+          noPreviewTitle: "Chưa có PDF preview",
+          noPreviewBody: "Bấm “Tải lại PDF” để lấy lại bản PLAIN từ máy chủ.",
+          noRoleTitle: "Chưa chọn chữ ký",
+          noRoleBody: "Chọn một chữ ký ở panel bên trái để đặt vị trí.",
+          invisibleTitle: "Chữ ký không hiển thị",
+          invisibleBody:
+            "Chữ ký này được cấu hình invisible signature nên không cần vị trí trên trang.",
+          unnamedRole: "Chữ ký chưa đặt tên",
+          noCode: "chưa có mã",
+          pageChip: (page: number) => `Trang ${page}`,
+          noBox: "Không có khung ký",
+          roleNamePlaceholder: "VD: Người lao động",
+          deleteRole: "Xóa chữ ký",
+          roleCodeLabel: "Mã vai",
+          roleCodeHint: "Định danh nghiệp vụ gửi lên máy chủ. Đổi nhãn không đổi mã.",
+          roleCodePlaceholder: "EMPLOYEE",
+          suggestedSigner: "Gợi ý người ký",
+          noSuggestion: "Không gợi ý",
+          baselineLabel: "Baseline",
+          locationLabel: "Địa điểm ký",
+          reasonLabel: "Lý do ký",
+          visibleLabel: "Hiển thị chữ ký trên tài liệu",
+          visibleHint:
+            "Mẫu bắt buộc bật: máy chủ đòi mỗi vai phải có ít nhất một khung chữ ký, nên chữ ký vô hình sẽ chặn publish.",
+        },
+
+        review: {
+          emptyTitle: "Chưa có template",
+          emptyBody: "Quay lại các bước trước để cấu hình.",
+          summaryTemplate: "Template",
+          summaryNoCode: "Chưa có mã",
+          summaryFields: "Biến",
+          summaryFieldsSub: "máy chủ dò được",
+          summarySteps: "Bước ký",
+          summaryStepsSub: (roles: number) => `${roles} chữ ký`,
+          summaryStatus: "Trạng thái",
+          summaryStatusSub: "sau khi publish",
+          publishEyebrow: "KIỂM TRA CUỐI",
+          publishTitle: "Sẵn sàng publish mẫu?",
+          publishDescription:
+            "Publish chuyển mẫu sang ACTIVE và chốt bản này lại — bản đã publish không sửa được nữa.",
+          blockersTitle: "Điều kiện bắt buộc",
+          noBlockers: "Không còn lỗi chặn publish.",
+          warningsTitle: "Cảnh báo model",
+          noWarnings: "Không có cảnh báo bổ sung.",
+          workflowEyebrow: "WORKFLOW",
+          workflowTitle: "Tóm tắt luồng ký",
+          workflowDescription: "Thứ tự từ trên xuống dưới là thứ tự thực thi của workflow.",
+          stepFallback: (n: number) => `Bước ${n}`,
+          orderChip: (n: number) => `Thứ tự ký ${n}`,
+          unnamedRole: "Chưa đặt tên",
+          finalEyebrow: "BẢN KIỂM TRA CUỐI",
+          finalTitle: "PDF có tô biến, kèm mọi khung chữ ký",
+          finalDescription:
+            "PDF do máy chủ dựng; khung chữ ký vẽ đè ở đây theo đúng toạ độ sẽ được gửi lên.",
+          loadingHighlight: "Đang tải bản PDF có tô biến…",
+          previewFailedTitle: "Không tải được preview",
+          noPreviewTitle: "Chưa có PDF preview",
+          noPreviewBody: "Quay lại bước trước để tải bản PDF.",
+        },
+
+        previewPanel: {
+          refresh: "Làm mới",
+          fullscreen: "Toàn màn hình",
+          loading: "Backend đang render PDF preview…",
+          errorTitle: "Không tạo được preview",
+          emptyTitle: "Chưa có PDF preview",
+          emptyBody: "Preview sẽ xuất hiện sau khi API render tài liệu được kết nối.",
+        },
+
+        fullscreen: {
+          label: (title: string) => `Preview ${title}`,
+          subtitle: "Preview cuối · biến được highlight · khung chữ ký hiển thị theo cấu hình",
+          close: "Đóng preview",
+        },
+
+        viewer: {
+          previousPage: "Trang trước",
+          currentPage: "Trang hiện tại",
+          nextPage: "Trang sau",
+          zoomOut: "Thu nhỏ",
+          zoomIn: "Phóng to",
+          fitWidth: "Vừa chiều rộng",
+          pages: (n: number) => `PDF · ${n} trang`,
+          preparing: "Đang chuẩn bị PDF…",
+          frameTitle: "PDF preview",
+        },
+
+        metadataOnly: {
+          eyebrow: "SỬA MẪU",
+          title: "Thông tin nhận diện",
+          description: "Mã mẫu và nội dung tài liệu không đổi được sau khi mẫu đã tồn tại.",
+          codeLabel: "Mã template",
+          statusLabel: "Trạng thái",
+          nameLabel: "Tên template",
+          descriptionLabel: "Mô tả",
+          lockedNote:
+            "Mẫu này đã rời trạng thái nháp nên máy chủ khoá cả tên và mô tả. Muốn đổi nội dung hay luồng ký thì phải tạo một mẫu mới — dịch vụ chưa có API tạo bản (version) mới cho mẫu đã publish.",
+          editableNote:
+            "Chỉ tên và mô tả sửa được ở đây. Biến, vai ký và vị trí chữ ký thuộc về bản đã publish và là bất biến.",
+        },
+
+        status: {
+          DRAFT: "Bản nháp",
+          ACTIVE: "Đang hoạt động",
+          INACTIVE: "Tạm ngưng",
+          ARCHIVED: "Lưu trữ",
+        },
+
+        variableType: {
+          text: "Văn bản (TEXT)",
+          multiline: "Văn bản dài (LONG_TEXT)",
+          number: "Số (NUMBER)",
+          date: "Ngày (DATE)",
+          select: "Danh sách chọn (SELECT)",
+        },
+
+        blockers: {
+          unnamedRole: "chữ ký chưa đặt tên",
+          codeMissing: "Chưa nhập mã template.",
+          codeInvalid:
+            "Mã template phải bắt đầu bằng chữ hoặc số, và chỉ chứa chữ, số, gạch dưới, gạch nối.",
+          codeTooLong: (max: number) => `Mã template vượt quá ${max} ký tự.`,
+          noDocument: "Chưa chọn tài liệu nguồn.",
+          nameMissing: "Chưa nhập tên template.",
+          nameTooLong: (max: number) => `Tên template vượt quá ${max} ký tự.`,
+          descriptionTooLong: (max: number) => `Mô tả vượt quá ${max} ký tự.`,
+          notAnalyzed: "Tài liệu chưa được máy chủ nhận và phân tích.",
+          selectNoOptions: (key: string) =>
+            `Biến {{${key}}} kiểu danh sách chưa có lựa chọn nào.`,
+          defaultNotInOptions: (key: string) =>
+            `Giá trị mặc định của {{${key}}} không nằm trong danh sách lựa chọn.`,
+          noRoles: "Chưa có chữ ký nào trong luồng ký.",
+          emptyStep: (step: number) => `Bước ${step} chưa có chữ ký nào.`,
+          roleUnnamed: "Còn chữ ký chưa đặt tên vai.",
+          roleNoCode: (label: string) => `Chữ ký “${label}” chưa có mã vai.`,
+          duplicateRoleCode: (code: string) => `Mã vai “${code}” bị trùng.`,
+          roleInvisible: (label: string) =>
+            `Chữ ký “${label}” đang để vô hình. Mẫu bắt buộc mọi vai phải có khung chữ ký trên trang.`,
+          slotPageOutOfRange: (label: string, page: number, pageCount: number) =>
+            `Chữ ký “${label}” đặt ở trang ${page}, ngoài phạm vi ${pageCount} trang.`,
+          slotNoSize: (label: string) => `Khung chữ ký “${label}” không có kích thước.`,
+          slotOutOfBounds: (label: string) => `Khung chữ ký “${label}” nằm tràn ra ngoài mép trang.`,
+          slotOverlap: (first: string, second: string) =>
+            `Khung chữ ký “${first}” và “${second}” đè lên nhau.`,
+        },
+      },
+
+      form: {
+        titleCreate: "Tạo mẫu",
+        titleEdit: "Sửa mẫu",
+        description:
+          "Đặt tên mẫu, nói khi nào thì lấy ra dùng, và đính tài liệu mà mẫu dựng lên từ đó. Các ô phải điền và vai ký được cấu hình ở phiên bản, sau bước này.",
+
+        codeLabel: "Mã mẫu",
+        codePlaceholder: "HOP_DONG_DICH_VU",
+        codeHint: "Định danh mà dịch vụ gọi tới. Chỉ chữ, số và gạch dưới.",
+        nameLabel: "Tên mẫu",
+        namePlaceholder: "Hợp đồng dịch vụ",
+        descriptionLabel: "Mô tả",
+        descriptionHint: "Một dòng để đồng nghiệp biết khi nào thì lấy mẫu này ra dùng.",
+        statusLabel: "Trạng thái",
+        status: {
+          DRAFT: "Bản nháp",
+          ACTIVE: "Đang phục vụ",
+          INACTIVE: "Ngừng phục vụ",
+          ARCHIVED: "Đã lưu trữ",
+        },
+
+        fileSection: "Tài liệu nguồn",
+        chooseFile: "Chọn tài liệu",
+        replaceFile: "Đổi tệp",
+        noFile: "Chưa chọn tài liệu nào.",
+        fileHint:
+          "PDF, DOCX hoặc XLSX. Mọi chỗ bạn đã gõ {{ten_bien}} trong tệp trở thành một ô phải điền.",
+        keepFile: "Để trống nếu vẫn giữ tài liệu mà phiên bản hiện tại đang dùng.",
+
+        incomplete: "Mẫu cần có mã và tên.",
+        notWired:
+          "Chưa gửi đi đâu cả: hộp thoại này mới chỉ gom giá trị, lời gọi tạo/sửa mẫu còn phải nối vào dịch vụ.",
+        save: "Lưu mẫu",
+      },
+
+      manager: {
+        title: "Quản lý mẫu",
+        description: "Mọi thứ dùng lại được của một yêu cầu ký nằm ở đây.",
+        searchPlaceholder: "Tìm mẫu",
+        create: "Tạo mẫu",
+        use: "Dùng",
+        edit: "Sửa",
+        duplicate: "Nhân bản",
+        delete: "Xoá",
+        copySuffix: "(bản sao)",
+        updatedAt: (value: string) => `sửa ${value}`,
+        confirmDelete: (name: string) => `Xoá “${name}”? Không khôi phục lại được.`,
+        saved: "Đã lưu mẫu",
+        deleted: "Đã xoá mẫu",
+        deleteFailed: "Không xoá được mẫu",
+        saveFailed: "Không lưu được mẫu",
+        saveFailedBody:
+          "Bộ nhớ của trình duyệt từ chối ghi — nhiều khả năng đã đầy. Xoá bớt một mẫu không còn dùng rồi thử lại.",
+        storageNote:
+          "Mẫu chỉ nằm trong trình duyệt này. Đồng nghiệp không thấy được, và xoá dữ liệu duyệt web là mất.",
+      },
+
+      editor: {
+        titleCreate: "Tạo mẫu",
+        titleEdit: "Sửa mẫu",
+        description:
+          "Bên trái là tài liệu và những chỗ trống trong nó; bên phải là ai ký, theo thứ tự nào.",
+
+        pickFileTitle: "Bắt đầu từ một tài liệu",
+        pickFileBody:
+          "Tải lên tệp mà mẫu này sinh ra. Mọi chỗ bạn đã gõ {{ten_bien}} trong tệp trở thành một ô phải điền; khung chữ ký được đặt lên chính tệp đó.",
+        chooseFile: "Chọn tài liệu",
+        fileTooLarge: (limit: string) =>
+          `Tệp lớn hơn ${limit}. Mẫu nằm trong bộ nhớ của trình duyệt, chỗ đó không chứa nổi tài liệu cỡ này.`,
+
+        infoSection: "Mẫu",
+        nameLabel: "Tên mẫu",
+        namePlaceholder: "Hợp đồng dịch vụ",
+        descriptionLabel: "Mô tả",
+        descriptionHint: "Một dòng để đồng nghiệp biết khi nào thì lấy mẫu này ra dùng.",
+
+        fileSection: "Tài liệu",
+        replaceFile: "Đổi tệp",
+        nonPdfNote:
+          "Chỉ PDF mới có khung chữ ký hiển thị trên trang. Vị trí đặt bên dưới vẫn được ghi lại nhưng không vẽ ra với định dạng này.",
+        scanning: "Đang đọc tài liệu…",
+        scanned: (count: number) =>
+          count === 0
+            ? "Không thấy chỗ trống dạng {{ten_bien}} nào trong tài liệu."
+            : `Thấy ${count} chỗ trống trong tài liệu.`,
+        scanFailed:
+          "Không đọc được phần chữ của tệp này. Khai báo biến bằng tay — chúng vẫn hoạt động bình thường.",
+        undeclaredFound: (count: number) =>
+          `${count} chỗ trống có trong tài liệu nhưng chưa khai báo. Sẽ không ai được hỏi để điền chúng.`,
+        addAllVariables: "Khai báo hết",
+
+        variablesSection: "Các biến",
+        addVariable: "Thêm biến",
+        noVariables:
+          "Chưa có biến nào. Mọi thứ viết dạng {{ten_bien}} trong tài liệu thuộc về chỗ này.",
+        removeVariable: "Bỏ biến",
+        variableKeyLabel: "Tên biến trong tệp",
+        variableLabelLabel: "Nhãn",
+        variableLabelPlaceholder: "Nhãn hiện trên form điền",
+        variableTypeLabel: "Kiểu",
+        variableType: {
+          text: "Văn bản",
+          multiline: "Văn bản dài",
+          number: "Số",
+          date: "Ngày",
+          select: "Chọn một",
+        },
+        optionsLabel: "Các lựa chọn",
+        optionsPlaceholder: "Các lựa chọn, ngăn nhau bằng dấu phẩy",
+        defaultValueLabel: "Giá trị mặc định",
+        defaultValuePlaceholder: "Giá trị mặc định",
+        variableHintLabel: "Gợi ý",
+        variableHintPlaceholder: "Gợi ý dưới ô nhập",
+        requiredLabel: "Bắt buộc",
+        notInDocument: "không có trong tệp",
+        notInDocumentHint:
+          "Không tìm thấy tên này trong phần chữ của tài liệu. Một cái tên gõ sai thì không bao giờ được điền.",
+
+        defaultsSection: "Mặc định cho yêu cầu",
+        requestNameLabel: "Tên yêu cầu",
+        requestNamePlaceholder: "Hợp đồng {{so_hop_dong}}",
+        messageLabel: "Lời nhắn cho người ký",
+        patternHint: "Dùng được {{ten_bien}} ở đây — nó được thay bằng giá trị đã điền.",
+        deadlineDaysLabel: "Hạn ký, tính bằng ngày",
+        deadlineDaysHint: "Tính từ ngày tạo yêu cầu. Bỏ trống nghĩa là không đặt hạn.",
+
+        flowSection: "Các chỗ ký",
+        flowHint:
+          "Một chỗ ký là một VAI, không phải một người: “Kế toán trưởng”, không phải một cái tên. Người cụ thể được chọn ở mỗi lần dùng mẫu.",
+        addRole: "Thêm chỗ ký",
+        removeRole: "Bỏ chỗ ký",
+        roleLabel: "Tên chỗ ký",
+        rolePlaceholder: "Kế toán trưởng",
+        unnamedRole: "Chỗ ký chưa đặt tên",
+        suggestedLabel: "Người thường ký",
+        suggestedHint: "Điền sẵn cho người dùng mẫu — họ vẫn đổi được.",
+        noSuggestion: "Không gợi ý ai",
+        showConfig: "Cấu hình",
+        hideConfig: "Thu gọn",
+        emptyStep: "Bước này chưa có chỗ ký nào.",
+
+        save: "Lưu mẫu",
+        ready: "Sẵn sàng lưu",
+        moreIssues: (count: number) => `và ${count} mục nữa`,
+        issue: {
+          NO_NAME: "Mẫu chưa có tên.",
+          NO_FILE: "Mẫu chưa có tài liệu.",
+          NO_ROLE: "Mẫu chưa có chỗ ký nào.",
+          ROLE_WITHOUT_NAME: "Một chỗ ký chưa được đặt tên.",
+          EMPTY_STEP: (index: number) => `Bước ${index} chưa có chỗ ký nào.`,
+          DUPLICATE_VARIABLE_KEY: (key: string) => `Biến {{${key}}} bị khai báo hai lần.`,
+          SELECT_WITHOUT_OPTIONS: (key: string) =>
+            `{{${key}}} là biến chọn một nhưng chưa có lựa chọn nào.`,
+          UNDECLARED_VARIABLE: (key: string) =>
+            `{{${key}}} có trong tài liệu nhưng chưa khai báo — sẽ không ai được hỏi giá trị của nó.`,
+        },
+      },
     },
   },
 
@@ -1082,6 +2007,8 @@ export const vi: Dictionary = {
     signatureList: {
       title: "Chữ ký tìm thấy",
       empty: "Không tìm thấy chữ ký nào trong tệp này.",
+      checksPassed: (passed: number, total: number) =>
+        `Đạt ${passed}/${total} mục kiểm tra chính`,
     },
     empty: {
       title: "Tải lên một tệp đã ký",
@@ -1133,6 +2060,41 @@ export const vi: Dictionary = {
       signatureAlgorithm: "Thuật toán ký",
       digestAlgorithm: "Thuật toán băm",
       validationSummary: "Tóm tắt xác thực",
+    },
+    /*
+     * Năm thẻ của schema 6.1.0. Nhãn để ở đây cho màn hình còn song ngữ, riêng
+     * `detail` vẫn lấy nguyên của backend vì đó là chỗ duy nhất nói được lý do
+     * của chính ca đang xem. `id` chưa có trong bảng này rơi về `title` backend
+     * trả, nên một thẻ mới ở bản minor sau vẫn hiện ra được.
+     */
+    primaryChecks: {
+      documentTitle: "Kiểm tra chính trên toàn tài liệu",
+      documentDescription:
+        "Kết quả xấu nhất của từng mục trên mọi chữ ký. Chọn một chữ ký để xem kết quả của riêng nó.",
+      linkedIssues: (n: number) => (n === 1 ? "Xem nguyên nhân →" : `Xem ${n} nguyên nhân →`),
+      byId: {
+        INTEGRITY: {
+          title: "Tính toàn vẹn",
+          description: "Nội dung được ký không đổi kể từ lúc ký.",
+        },
+        TRUSTED_SIGNATURE: {
+          title: "Chữ ký tin cậy",
+          description:
+            "Giá trị chữ ký đúng về mật mã và chứng thư người ký neo được về một nguồn tin cậy.",
+        },
+        SIGNED_WITHIN_VALIDITY: {
+          title: "Ký trong thời gian hiệu lực",
+          description: "Chữ ký được tạo khi chứng thư của người ký còn hiệu lực.",
+        },
+        TIMESTAMP_PRESENT: {
+          title: "Dấu thời gian",
+          description: "Tài liệu có mang một dấu thời gian hợp lệ hay không.",
+        },
+        CERTIFICATE_NOT_REVOKED: {
+          title: "Chứng thư chưa bị thu hồi",
+          description: "Chứng thư người ký chưa bị thu hồi tại mốc thời gian tham chiếu.",
+        },
+      } as Record<string, { title: string; description: string }>,
     },
     validation: {
       groups: {
@@ -1355,8 +2317,13 @@ export const vi: Dictionary = {
       verificationResult: "Kết quả xác thực",
       signatures: "Chữ ký",
       signer: "Người ký",
+      signatureDetailTitle: "Chi tiết chữ ký",
       trust: "Tin cậy",
       signingTime: "Thời gian ký",
+      /* Cố ý không gọi là "Thời gian ký": chưa có gì chứng minh giá trị này ngoài lời khai của người ký. */
+      claimedSigningTime: "Người ký khai ký lúc",
+      timestampNotTrustedTime:
+        "Dấu thời gian hợp lệ, nhưng verifier chưa nạp trust anchor của TSA nên chưa dùng mốc thời gian này làm thời điểm tham chiếu.",
       userChecks: "Kiểm tra chính",
       integrity: "Tính toàn vẹn nội dung",
       integrityDescription: "Kiểm tra phạm vi nội dung mà chữ ký bảo vệ.",
@@ -1978,5 +2945,442 @@ export const vi: Dictionary = {
       retryFailedTitle: "Thử lại thất bại",
     },
     correlationId: (id: string) => `Correlation ID: ${id}`,
+  },
+
+  /**
+   * QUYỀN KÝ ĐỘC QUYỀN (signing lease) — dùng chung cho màn ký nội bộ và màn ký
+   * công khai, vì cả hai nói về đúng một cơ chế của backend.
+   *
+   * Câu chữ cố ý KHÔNG nhắc tới "lease": người ký không cần biết tên cơ chế, họ
+   * cần biết bây giờ chờ hay bấm được. Riêng nhánh `lockedByBody` (có tên người
+   * đang ký) CHỈ màn nội bộ dùng — xem `SigningLeasePanel`.
+   */
+  signingLease: {
+    checking: "Đang kiểm tra lượt ký…",
+    lockedTitle: "Đang có người khác ký",
+    lockedBody:
+      "Một người ký khác đang ký tài liệu này. Vui lòng chờ người ký hiện tại hoàn tất — màn hình tự cập nhật khi lượt ký khả dụng.",
+    lockedByBody: (holder: string) =>
+      `${holder} đang ký tài liệu này. Vui lòng chờ — màn hình tự cập nhật khi lượt ký hoàn tất.`,
+    lockedRetryHint: (seconds: number) =>
+      `Lượt ký hiện tại còn tối đa ${Math.max(1, Math.ceil(seconds / 60))} phút.`,
+    heldTitle: "Bạn đang có một lượt ký đang mở",
+    heldBody:
+      "Dịch vụ ký ghi nhận một lượt ký của bạn còn dở — thường là do tải lại trang hoặc mở ở một tab khác. Huỷ lượt cũ để bắt đầu lại từ đầu.",
+    cancel: "Huỷ lượt cũ và bắt đầu lại",
+    cancelling: "Đang huỷ…",
+    errorTitle: "Không kiểm tra được trạng thái lượt ký",
+    errorBody:
+      "Chưa biết lượt ký này có đang trống hay không, nên chưa cho ký. Thử lại sau giây lát.",
+    retry: "Thử lại",
+
+    /** Câu ngắn nằm dưới nút Ký, nói vì sao nó đang tắt. */
+    action: {
+      checking: "Đang kiểm tra trạng thái lượt ký…",
+      locked: "Người ký khác đang ký tài liệu này.",
+      held: "Huỷ lượt ký đang mở trước khi ký lại.",
+      unavailable: "Chưa kiểm tra được trạng thái lượt ký.",
+    },
+
+    /** `SIGNING_LEASE_LOCKED` — thua cuộc đua ngay tại lệnh ký. */
+    lockedNowTitle: "Người khác vừa bắt đầu ký trước",
+    lockedNowBody:
+      "Lượt ký vừa được chuyển cho người ký khác trong đúng giây bạn bấm. Chưa có gì của bạn được gửi đi — màn hình sẽ tự mở lại khi tới lượt bạn.",
+
+    /** `SIGNING_LEASE_LOST` — lượt ký đang dở không còn hợp lệ. */
+    lostTitle: "Lượt ký đã kết thúc",
+    lostBody:
+      "Lượt ký đã hết hạn hoặc được chuyển cho người khác. Mọi bước đang dở đã bị bỏ — vui lòng bắt đầu lại từ đầu khi lượt ký khả dụng.",
+  },
+
+  externalSign: {
+    meta: {
+      title: "Ký tài liệu",
+      description: "Xem tài liệu và ký — không cần tài khoản",
+    },
+
+    chrome: {
+      brand: "FIS CA",
+      subtitle: "Ký tài liệu điện tử",
+      publicBadge: "Liên kết ký dành riêng cho bạn",
+      secureNote: "Không cần đăng nhập. Liên kết này chỉ ký đúng một chữ ký — của bạn.",
+      sessionExpiresIn: (remaining: string) => `Phiên còn ${remaining}`,
+      sessionEndingSoon: "Phiên sắp hết hạn",
+      sessionExpired: "Phiên đã hết hạn",
+      sessionExpiredBody:
+        "Chưa có gì được ký. Mở lại liên kết trong email của bạn để bắt đầu phiên mới.",
+    },
+
+    demo: {
+      badge: "Bản mô phỏng",
+      title: "Bản mô phỏng giao diện — không có gì được ký",
+      body:
+        "Nhóm endpoint ký công khai hiện là contract mục tiêu, chưa được cài vào dịch vụ ký, nên trang này đang chạy trên dữ liệu giả dựng ngay tại trình duyệt. Không lời gọi nào đi ra và không chữ ký nào được tạo.",
+      scenarios:
+        "Thêm kịch bản vào liên kết để xem các trạng thái khác: #demo=1&t=expired, t=invalid, t=notcurrent, t=signed, t=changed, t=conflict (người cùng cấp ký trước), t=locked (người khác đang giữ lượt ký).",
+    },
+
+    loading: {
+      title: "Đang mở liên kết ký của bạn",
+      body: "Đang kiểm tra liên kết và tải tài liệu. Việc này mất một lát.",
+    },
+
+    unavailable: {
+      whatNow: "Việc cần làm",
+      contactSender: "Liên hệ người đã gửi tài liệu cho bạn để nhận liên kết mới.",
+      retry: "Thử lại",
+      codeLabel: "Mã lỗi",
+      correlationLabel: (id: string) => `Mã tra cứu: ${id}`,
+    },
+
+    errors: {
+      unknownTitle: "Đã xảy ra lỗi",
+      unknownBody: "Vui lòng thử lại. Nếu vẫn vậy, hãy liên hệ người gửi tài liệu.",
+      EXTERNAL_SIGNING_NO_SESSION: {
+        title: "Trang này cần một liên kết ký",
+        body: "Hãy mở liên kết trong email hoặc tin nhắn bạn nhận được. Liên kết đó mang mã xác định bạn là ai.",
+      },
+      EXTERNAL_SIGNING_TOKEN_INVALID: {
+        title: "Liên kết không hợp lệ",
+        body: "Có thể liên kết bị gõ sai, bị trình email cắt ngắn, hoặc đã bị thay bằng một liên kết mới hơn.",
+      },
+      EXTERNAL_SIGNING_FORBIDDEN: {
+        title: "Phiên này không ký được",
+        body: "Dịch vụ ký không còn tin phiên hiện tại. Mở lại liên kết của bạn để bắt đầu phiên mới.",
+      },
+      EXTERNAL_SIGNING_LINK_EXPIRED: {
+        title: "Liên kết đã hết hạn",
+        body: "Liên kết ký chỉ có hiệu lực trong một thời gian nhất định. Chưa có gì được ký.",
+      },
+      EXTERNAL_SIGNING_CSRF_MISSING: {
+        title: "Tab này không ký được",
+        body: "Bạn vẫn đọc được tài liệu, nhưng khoá của phiên ký đã mất — chuyện này xảy ra khi mở lại trang ở một tab mới. Hãy mở lại liên kết của bạn để ký.",
+      },
+      EXTERNAL_SIGNING_API_NOT_CONFIGURED: {
+        title: "Hiện chưa ký được",
+        body: "Trang này chưa kết nối được tới dịch vụ ký. Vui lòng báo người gửi tài liệu.",
+      },
+      EXTERNAL_SIGNING_API_UNREACHABLE: {
+        title: "Không kết nối được tới dịch vụ ký",
+        body: "Thường chỉ là tạm thời. Thử lại sau một phút.",
+      },
+      SIGNER_NOT_CURRENT: {
+        title: "Chưa tới lượt bạn ký",
+        body: "Còn người phải ký trước bạn. Khi họ ký xong, bạn dùng đúng liên kết này là ký được.",
+      },
+      SIGNING_DOCUMENT_CHANGED: {
+        title: "Tài liệu đã thay đổi",
+        body: "Tài liệu bị sửa sau khi liên kết của bạn được tạo, nên liên kết này không còn khớp. Hãy xin người gửi một liên kết mới.",
+      },
+      SIGNER_ALREADY_PROCESSED: {
+        title: "Bạn đã ký tài liệu này",
+        body: "Không cần làm gì thêm. Người gửi đã nhận được chữ ký của bạn.",
+      },
+      SIGNING_LEASE_LOCKED: {
+        title: "Người khác đang ký tài liệu này",
+        body: "Lượt ký vừa được chuyển cho một người ký khác. Chờ họ hoàn tất rồi ký lại — không cần mở lại liên kết.",
+      },
+      SIGNING_LEASE_LOST: {
+        title: "Lượt ký của bạn đã kết thúc",
+        body: "Lượt ký đã hết hạn hoặc được chuyển cho người khác. Hãy bắt đầu lại từ đầu khi lượt ký khả dụng.",
+      },
+      SIGNING_ALREADY_STARTED: {
+        title: "Đang có một lượt ký chưa xong",
+        body: "Hãy tiếp tục lượt ký đó bên dưới thay vì bắt đầu lại.",
+      },
+      SIGNING_NOT_STARTED: {
+        title: "Lượt ký đó không còn hiệu lực",
+        body: "Hãy ký lại từ đầu.",
+      },
+      SIGN_REQUEST_INVALID: {
+        title: "Kiểm tra lại thông tin bạn nhập",
+        body: "Có thông tin ký còn thiếu hoặc chưa khớp. Xem lại các ô rồi thử lại.",
+      },
+      SIGNED_DOCUMENT_MISSING: {
+        title: "Không lưu được chữ ký",
+        body: "Đừng thử lại ngay — hãy liên hệ người gửi để họ kiểm tra với bộ phận hỗ trợ.",
+      },
+    },
+
+    summary: {
+      title: "Bạn đang ký",
+      documentLabel: "Tài liệu",
+      signerLabel: "Ký với tư cách",
+      orderLabel: "Lượt của bạn",
+      order: (position: number) => `Người ký thứ ${position}`,
+      checksumLabel: "Mã kiểm tra tài liệu",
+      checksumHint:
+        "Mã này ứng với đúng tệp bạn đang xem. Nếu người gửi đọc cho bạn một mã khác, đừng ký.",
+      statusPending: "Đang chờ bạn ký",
+      statusSigned: "Đã ký",
+      statusDeclined: "Đã từ chối",
+    },
+
+    steps: {
+      navLabel: "Các bước ký",
+      stepOf: (current: number, total: number) => `Bước ${current}/${total}`,
+      lockedHint: "Hoàn tất các bước trước để mở bước này.",
+      review: {
+        label: "Đọc",
+        title: "Đọc tài liệu",
+        description: "Xem hết tài liệu, rồi xác nhận bạn đồng ý ký.",
+      },
+      method: {
+        label: "Cách ký",
+        title: "Bạn muốn ký bằng cách nào?",
+        description: "Chọn thứ bạn đang có — mỗi cách ghi rõ cần những gì.",
+      },
+      credential: {
+        label: "Thông tin",
+        title: "Thông tin để ký",
+        description: "Điền những gì cách ký bạn vừa chọn cần ở bạn.",
+      },
+      sign: {
+        label: "Ký",
+        title: "Đặt chữ ký của bạn",
+        description: "Xem lại lần cuối, rồi ký.",
+      },
+    },
+
+    viewer: {
+      title: "Tài liệu",
+      loading: "Đang tải tài liệu…",
+      errorTitle: "Không tải được tài liệu",
+      retry: "Tải lại",
+      page: (current: number, total: number) => `Trang ${current}/${total}`,
+      previous: "Trang trước",
+      next: "Trang sau",
+      zoomIn: "Phóng to",
+      zoomOut: "Thu nhỏ",
+      signatureBadge: "Chữ ký của bạn",
+      signatureOnPage: (page: number) => `Chữ ký của bạn nằm ở trang ${page}`,
+      goToSignature: "Đến vị trí ký của tôi",
+      pageHasSignature: "Trang này có chữ ký",
+      extraSlots: (count: number) =>
+        `Tài liệu này có ${count} ô chữ ký của bạn. Tất cả đều đã được đánh dấu.`,
+      nonPdfTitle: "Không xem trước được định dạng này",
+      nonPdfBody:
+        "Bạn vẫn ký được. Nếu cần đọc kỹ trước, hãy xin người gửi một bản để xem.",
+    },
+
+    consent: {
+      title: "Trước khi ký",
+      checkbox: "Tôi đã đọc và đồng ý ký tài liệu này",
+      hint: "Chữ ký điện tử của bạn có giá trị pháp lý như chữ ký tay.",
+      scrollNote: "Hãy xem hết các trang — chữ ký có hiệu lực với toàn bộ tài liệu.",
+    },
+
+    method: {
+      title: "Bạn muốn ký bằng cách nào?",
+      note: "Người gửi quyết định những cách ký được phép dùng cho tài liệu này.",
+      requirementLabel: "Bạn cần có",
+      pkcs12: {
+        label: "Tệp chứng thư (.p12 / .pfx)",
+        description: "Bạn đang giữ tệp chứng thư và mật khẩu của nó.",
+        requirement: "Tệp .p12 hoặc .pfx và mật khẩu của tệp",
+      },
+      mpki: {
+        label: "Ứng dụng FPT MPKI",
+        description: "Bạn xác nhận chữ ký trên điện thoại.",
+        requirement: "Ứng dụng FPT MPKI đã đăng nhập trên điện thoại",
+      },
+      signCloud: {
+        label: "FPT eSign Cloud",
+        description: "Bạn xác nhận danh tính rồi nhập mã OTP.",
+        requirement: "Thông tin CCCD và số điện thoại đã đăng ký với FPT",
+      },
+      usbToken: {
+        label: "FPT USB Token",
+        description: "Bạn ký bằng chứng thư nằm trong USB Token.",
+        requirement:
+          "USB Token đang cắm vào máy này, mã PIN của nó, và FPT-CA Signing Agent đang chạy",
+      },
+      /** Hiện trên cách ký mà định dạng tài liệu loại trừ — USB Token chỉ ký PDF. */
+      unsupportedForFormat: "Không dùng được với định dạng tệp này",
+    },
+
+    pkcs12: {
+      title: "Tệp chứng thư PKCS#12 (.p12 / .pfx)",
+      fileLabel: "Tệp chứng thư",
+      chooseFile: "Chọn tệp",
+      replaceFile: "Đổi tệp",
+      noFile: "Chưa chọn tệp",
+      passwordLabel: "Mật khẩu của tệp",
+      passwordPlaceholder: "Mật khẩu bảo vệ tệp chứng thư",
+      aliasLabel: "Tên khoá (không bắt buộc)",
+      aliasPlaceholder: "Để trống để dùng khoá đầu tiên",
+      aliasHint: "Chỉ cần điền khi trong tệp có nhiều hơn một chứng thư.",
+      privacyNote:
+        "Tệp và mật khẩu được gửi đúng một lần để tạo chữ ký này, trang này không lưu lại.",
+    },
+
+    mpki: {
+      usernameLabel: "Tên đăng nhập MPKI",
+      usernamePlaceholder: "Tài khoản bạn dùng trong ứng dụng FPT MPKI",
+      loadCredentials: "Tìm chứng thư của tôi",
+      changeAccount:"Đổi tài khoản",
+      loading: "Đang tìm…",
+      credentialSelectLabel: "Chứng thư",
+      chooseCredential: "— Chọn chứng thư —",
+      multipleWarning:
+        "Tìm thấy nhiều hơn một chứng thư. Hãy chọn đúng cái bạn muốn dùng — chữ ký mang danh tính của chứng thư đó.",
+      loadFailed: "Không liệt kê được chứng thư của bạn",
+      empty: "Không có chứng thư nào đăng ký với tên đăng nhập này. Hãy kiểm tra lại.",
+      manualHint:
+        "Bạn cũng có thể tự gõ mã chứng thư nếu đã biết — để trống khi bạn chỉ có một chứng thư.",
+      credentialLabel: "Mã chứng thư (không bắt buộc)",
+      credentialPlaceholder: "Để trống nếu bạn chỉ có một chứng thư",
+      credentialHint: "Chỉ điền khi FPT cấp cho bạn nhiều hơn một chứng thư.",
+      note: "Sau khi bấm Ký, hãy để trang này mở và xác nhận yêu cầu trong ứng dụng.",
+    },
+
+    signCloud: {
+      haveCertificate: "Tôi đã có chứng thư eSign Cloud",
+      needCertificate: "Tôi cần cấp chứng thư mới",
+      agreementLabel: "Mã chứng thư (agreementUuid)",
+      agreementPlaceholder: "Mã FPT đã cấp cho bạn",
+      agreementHint: "Mã này được gửi cho bạn khi chứng thư được cấp.",
+      enrollmentTitle: "Đăng ký chứng thư",
+      enrollmentHint:
+        "FPT cấp chứng thư mang tên bạn từ những thông tin này. Chúng đi tới nhà cung cấp chứng thư, trang này không giữ lại.",
+      personalNameLabel: "Họ và tên",
+      citizenIdLabel: "Số CCCD",
+      mobileLabel: "Số điện thoại",
+      emailLabel: "Email",
+      locationLabel: "Thành phố (không bắt buộc)",
+      provinceLabel: "Tỉnh/Thành (không bắt buộc)",
+      countryLabel: "Quốc gia",
+      imagesTitle: "Ảnh giấy tờ",
+      imagesHint: "Hai mặt CCCD phải đọc được. Ảnh chân dung không bắt buộc.",
+      /*
+       * Mỗi nhãn một từ. Ba ô này nằm cạnh nhau trong cột rộng 23.5rem, và nhãn
+       * nào dài đủ để xuống dòng là ô đó cao hơn hai ô kia — tiêu đề ngay trên
+       * đã nói đây là ảnh giấy tờ rồi.
+       */
+      frontLabel: "Mặt trước",
+      backLabel: "Mặt sau",
+      faceLabel: "Chân dung",
+      chooseImage: "Chọn ảnh",
+      replaceImage: "Đổi ảnh",
+      removeImage: "Bỏ ảnh",
+      imageTooLarge: "Ảnh này quá lớn dù đã được thu nhỏ. Hãy thử một ảnh nhẹ hơn.",
+      imageNotImage: "Hãy chọn một tệp ảnh.",
+      imageUnreadable:
+        "Không đọc được ảnh này. Ảnh HEIC của iPhone thường bị lỗi — hãy thử ảnh JPG.",
+      required: "Bắt buộc",
+      requiredLegend: "Bắt buộc",
+
+      /* Đăng ký — đường duy nhất để có mã chứng thư. */
+      enroll: "Yêu cầu cấp chứng thư",
+      enrolling: "Đang gửi…",
+      enrollFailed: "Không gửi được yêu cầu cấp chứng thư",
+      requiredMissing: "Hãy điền đủ các ô có dấu * và nộp cả hai mặt CCCD.",
+      enrollHint:
+        "FPT kiểm tra những thông tin này rồi cấp chứng thư mang tên bạn. Bước sau bạn xác nhận danh tính trên trang của họ.",
+      agreementIssued: "Đã gửi yêu cầu cấp chứng thư",
+      agreementReadyTitle: "Chứng thư của bạn đã sẵn sàng",
+      agreementRestart: "Làm lại với thông tin khác",
+      confirmTitle: "Xác nhận danh tính",
+      confirmBody:
+        "Hãy mở trang của nhà cung cấp chứng thư và xác nhận thông tin ở đó. Xong thì quay lại tab này — trang sẽ tự kiểm tra giúp bạn.",
+      openSic: "Mở trang xác nhận danh tính",
+      sicWaiting: "Đang chờ trang đó…",
+      sicBlocked: "Trình duyệt đã chặn cửa sổ bật lên. Hãy dùng liên kết bên dưới.",
+      sicOpenManually: "Mở trang xác nhận ở tab mới",
+      checkStatus: "Kiểm tra chứng thư của tôi",
+      checking: "Đang kiểm tra…",
+      checkAgain: "Kiểm tra lại",
+      statusFailed: "Không đọc được trạng thái chứng thư",
+      notReadyYet:
+        "Chưa xác nhận xong. Hãy hoàn tất phần xác nhận danh tính trên trang của nhà cung cấp chứng thư rồi kiểm tra lại.",
+    },
+
+    /**
+     * USB Token — câu chữ dành cho khách ở bước điền thông tin. Hộp thoại ký thì
+     * dùng chung với màn `/sign` nên vẫn đọc `sign.usbToken`.
+     */
+    usbToken: {
+      title: "FPT USB Token",
+      checkAgent: "Thử kết nối",
+      agentChecking: "Đang thử…",
+      agentReady: (count: number) =>
+        `Signing Agent đã trả lời — tìm thấy ${count} chứng thư trong token của bạn.`,
+      noCertificates:
+        "Không tìm thấy chứng thư dùng được. Hãy kiểm tra token đã cắm vào máy và driver đã nhận nó chưa.",
+      errorUnreachable:
+        "Không kết nối được tới FPT-CA Signing Agent ở localhost:14211. Hãy cài và chạy phần mềm đó, rồi thử lại.",
+      errorGeneric: "Không đọc được USB Token.",
+      note: "Trình duyệt nói chuyện thẳng với Signing Agent trên máy bạn. Không có thông tin nào của token được gửi đi đâu cả.",
+      signerNameNote:
+        "Tên trên chữ ký là tên trong chứng thư nằm trong token của bạn — trang này không hỏi tên bao giờ.",
+      pinNote:
+        "Mã PIN chỉ được nhập trong cửa sổ của FPT-CA. Trang này không hỏi và không lưu mã PIN.",
+    },
+
+    action: {
+      signButton: "Ký tài liệu",
+      signing: "Đang ký…",
+      needConsent: "Hãy xác nhận bạn đã đọc tài liệu trước.",
+      needMethod: "Hãy chọn cách bạn muốn ký.",
+      needFields: "Hãy điền các ô ở trên.",
+      cannotSign: "Tab này không ký được — hãy mở lại liên kết của bạn.",
+      expired: "Phiên đã hết hạn. Hãy mở lại liên kết của bạn.",
+      reloadingDocument: "Đang tải bản tài liệu mới nhất…",
+      declineNote: "Nếu bạn không muốn ký, chỉ cần đóng trang này và báo lại người gửi.",
+    },
+
+    /** Có người ký cùng lúc với bạn: tài liệu đổi giữa chừng, ký lại là xong. */
+    stale: {
+      title: "Tài liệu vừa được cập nhật",
+      body: "Một người ký cùng bước với bạn vừa ký xong ngay trước đó nên tài liệu đã đổi. Bản mới nhất đang được tải về — bạn ký lại là chữ ký vào đúng bản đó.",
+    },
+
+    resume: {
+      title: "Bạn có một lượt ký đang dở",
+      description:
+        "Bạn đã bắt đầu ký bằng eSign Cloud và chưa hoàn tất. Tiếp tục để không phải làm lại từ đầu.",
+      dismiss: "Bỏ qua",
+      resume: "Tiếp tục",
+    },
+
+    pending: {
+      close: "Đóng",
+      working: "Đang xử lý…",
+      appTitle: "Đang chờ bạn xác nhận",
+      appBody:
+        "Mở ứng dụng FPT MPKI trên điện thoại và xác nhận yêu cầu. Hãy để trang này mở.",
+      identityTitle: "Xác nhận danh tính",
+      identityBody:
+        "Mở trang của nhà cung cấp chứng thư, xác nhận thông tin của bạn, rồi quay lại đây bấm tiếp tục.",
+      identityDoneTitle: "Sẵn sàng cho bước sau",
+      identityDoneBody: "Bấm tiếp tục để nhận mã OTP.",
+      openIdentity: "Mở trang xác nhận danh tính",
+      continueButton: "Tôi đã xác nhận — tiếp tục",
+      continueNote: "Bước này mở giao dịch ký tại nhà cung cấp chứng thư.",
+      otpTitle: "Nhập mã OTP",
+      otpBody:
+        "Trang của nhà cung cấp chứng thư sẽ hỏi mã gửi về điện thoại của bạn. Xong ở đó thì trang này tự lấy chữ ký về.",
+      otpReadyTitle: "Mở trang nhập mã",
+      otpReadyBody: "Nhập mã OTP để hoàn tất chữ ký.",
+      openOtp: "Mở trang nhập mã",
+      checkResult: "Kiểm tra kết quả",
+      otpNotDone:
+        "Chưa có chữ ký — trang nhập mã bị đóng trước khi xong. Hãy mở lại và nhập mã cho đủ.",
+      popupBlocked: "Trình duyệt của bạn đã chặn cửa sổ phụ. Hãy dùng liên kết bên dưới.",
+      expiresIn: (remaining: string) => `Còn lại: ${remaining}`,
+      expired: "Đã hết thời gian — hãy làm lại.",
+    },
+
+    completed: {
+      title: "Đã ký xong",
+      body: "Chữ ký của bạn đã được thêm vào tài liệu và gửi lại cho người gửi.",
+      documentLabel: "Tài liệu",
+      signerLabel: "Người ký",
+      signedAtLabel: "Thời điểm ký",
+      download: "Tải một bản về máy",
+      downloadHint: "Để bạn lưu lại. Người gửi đã có bản đã ký.",
+      noCopyNote: "Người gửi đã có bản đã ký. Cần một bản cho mình thì hãy hỏi họ.",
+      closeHint: "Bạn có thể đóng trang này.",
+    },
   },
 };

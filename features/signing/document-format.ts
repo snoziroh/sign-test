@@ -30,7 +30,18 @@ export function detectContentType(file: File): ContentType {
  * cùng mức chi tiết đó.
  */
 export function detectDocumentFormat(file: File): DocumentFormat | undefined {
-  switch (fileExtension(file.name).toLowerCase()) {
+  return documentFormatFromName(file.name);
+}
+
+/**
+ * Cùng phép suy luận, nhưng chỉ từ TÊN tệp.
+ *
+ * Cần cho những chỗ chưa có tệp trong tay: danh sách và chi tiết yêu cầu ký chỉ
+ * biết `document.fileName` từ máy chủ, và tải cả tệp về chỉ để đọc phần mở rộng
+ * là một lần tải hoàn toàn thừa.
+ */
+export function documentFormatFromName(fileName: string): DocumentFormat | undefined {
+  switch (fileExtension(fileName).toLowerCase()) {
     case "pdf":
       return "PDF";
     case "xml":

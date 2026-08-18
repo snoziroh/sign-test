@@ -22,7 +22,13 @@ export function ScreenNav() {
     >
       <ul className="inline-flex h-9 items-center gap-0.5 rounded-lg bg-inset p-0.75">
         {items.map((item) => {
-          const active = pathname === item.href;
+          /*
+           * So khớp cả các đường dẫn CON: `/sign-request` đã tách thành
+           * `/sign-request/workflows` và `/sign-request/create`, và một thanh
+           * điều hướng không sáng ở đâu cả khi người dùng đang đứng trong màn
+           * đó thì tệ hơn là không có.
+           */
+          const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
 
           return (
             <li

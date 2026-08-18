@@ -42,14 +42,18 @@ export function VerificationInspector({
   canManageAllowlist: boolean;
   onAllowlistReverify: (host: string) => Promise<void>;
 }) {
+  // Không có khung thẻ riêng: inspector nằm trong modal chi tiết chữ ký, khung
+  // của modal đã là khung của nó — và cũng là thứ ấn định chiều cao, nên mọi
+  // tầng ở đây đều `min-h-0` để phần cuộn rơi đúng vào panel trong cùng.
   return (
-    <section className="overflow-hidden rounded-lg border border-border bg-surface shadow-sm">
+    <section className="flex min-h-0 flex-1 flex-col bg-surface">
       <VerificationViewTabs t={t} value={view} onChange={onViewChange} />
 
       <div
         id={`verification-panel-${view}`}
         role="tabpanel"
         aria-labelledby={`verification-tab-${view}`}
+        className="flex min-h-0 flex-1 flex-col"
       >
         {view === "overview" ? (
           <OverviewPanel t={t} signature={signature} onShowAdvanced={() => onViewChange("advanced")} />
@@ -84,7 +88,7 @@ function VerificationViewTabs({
   ];
 
   return (
-    <div className="border-b border-border-muted px-4">
+    <div className="shrink-0 border-b border-border-muted bg-surface px-4">
       <div role="tablist" aria-label={t.verify.ux.viewTablistAriaLabel} className="flex gap-1">
         {tabs.map((tab) => (
           <button
@@ -132,15 +136,20 @@ function AdvancedPanel({
   const activeSection = visibleSections.includes(section) ? section : "technical";
 
   return (
-    <div>
-      <div className="border-b border-border-muted bg-surface-2 px-5 py-3">
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="shrink-0 border-b border-border-muted bg-surface-2 px-5 py-3">
         <p className="text-[11.5px] leading-relaxed text-fg-muted">{t.verify.ux.advancedDescription}</p>
       </div>
 
-      <div className="grid min-h-120 lg:grid-cols-[190px_minmax(0,1fr)]">
+      {/*
+        Flex thay cho grid: menu là một rail cố định (`shrink-0`), chỉ cột nội
+        dung bên phải nhận `overflow-y-auto`. Dưới `lg` menu nằm trên và cuộn
+        ngang như cũ, phần cuộn dọc vẫn thuộc về cột nội dung.
+      */}
+      <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
         <nav
           aria-label={t.verify.ux.advancedNavAriaLabel}
-          className="overflow-x-auto border-b border-border-muted lg:overflow-visible lg:border-r lg:border-b-0"
+          className="shrink-0 overflow-x-auto border-b border-border-muted lg:w-47.5 lg:overflow-visible lg:border-r lg:border-b-0"
         >
           <div className="flex min-w-max gap-1 p-2 lg:min-w-0 lg:flex-col">
             {visibleSections.map((item) => {
@@ -168,7 +177,7 @@ function AdvancedPanel({
           </div>
         </nav>
 
-        <div className="min-w-0 p-5">
+        <div className="min-h-0 min-w-0 flex-1 overflow-y-auto p-5">
           {activeSection === "technical" ? (
             <TechnicalOverviewPanel t={t} report={report} signature={signature} />
           ) : null}
@@ -327,7 +336,9 @@ function RawJsonPanel({
           {copied ? t.common.copied : t.verify.ux.copyJson}
         </button>
       </div>
-      <pre className="max-h-150 overflow-auto bg-[#0d1117] p-4 font-mono text-[11px] leading-6 text-[#e6edf3]">
+      {/* Chỉ cuộn ngang: cuộn dọc đã thuộc về cột nội dung của tab nâng cao,
+          để `max-h` ở đây nữa là sinh ra hai thanh cuộn lồng nhau. */}
+      <pre className="overflow-x-auto bg-[#0d1117] p-4 font-mono text-[11px] leading-6 text-[#e6edf3]">
         {raw}
       </pre>
     </div>

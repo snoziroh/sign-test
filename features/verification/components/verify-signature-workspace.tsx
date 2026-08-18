@@ -12,7 +12,9 @@ import { useLocale } from "@/components/i18n/locale-provider";
 import { AdvancedSection, Phase, VerificationView } from "./verification-config";
 import { ArtifactUpload, SignatureList } from "./verification-sidebar";
 import { EmptyVerificationState, NoSignaturesState, VerificationErrorState, VerificationProgress, VerificationResultHeader } from "./verification-states";
-import { VerificationInspector } from "./verification-inspector";
+import { PrimaryChecksPanel } from "./verification-primary-checks";
+import { SignatureDetailDialog } from "./verification-signature-dialog";
+import { SectionHeading } from "./verification-ui";
 
 export function VerifySignatureWorkspace({
   canManageAllowlist = false,
@@ -29,6 +31,8 @@ export function VerifySignatureWorkspace({
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [view, setView] = useState<VerificationView>("overview");
   const [advancedSection, setAdvancedSection] = useState<AdvancedSection>("technical");
+  /** Chi tiết một chữ ký chỉ bật lên khi người dùng bấm chữ ký đó ở danh sách. */
+  const [detailOpen, setDetailOpen] = useState(false);
   const [error, setError] = useState<VerifyApiClientError | FileTooLargeError | Error | null>(null);
 
   const selectedSignature = report?.signatures[selectedIndex];
@@ -43,6 +47,7 @@ export function VerifySignatureWorkspace({
     setSelectedIndex(0);
     setView("overview");
     setAdvancedSection("technical");
+    setDetailOpen(false);
 
     try {
       const result = await verifyFile(file);
@@ -68,13 +73,17 @@ export function VerifySignatureWorkspace({
     setSelectedIndex(0);
     setView("overview");
     setAdvancedSection("technical");
+    setDetailOpen(false);
 
     if (inputRef.current) inputRef.current.value = "";
   }
 
   return (
     <div className="grid gap-4 lg:grid-cols-[290px_minmax(0,1fr)]">
-      <aside className="space-y-3 lg:sticky lg:top-4 lg:self-start">
+      {/* `min-w-0`: tên người ký trong `SignatureList` là một dòng `truncate`,
+          nếu không cho cột co xuống dưới min-content thì ở màn hẹp nó đẩy cả
+          trang tràn ngang. */}
+      <aside className="min-w-0 space-y-3 lg:sticky lg:top-4 lg:self-start">
         <ArtifactUpload
           t={t}
           artifact={artifact}
@@ -95,6 +104,7 @@ export function VerifySignatureWorkspace({
               setSelectedIndex(index);
               setView("overview");
               setAdvancedSection("technical");
+              setDetailOpen(true);
             }}
           />
         ) : null}
@@ -109,6 +119,21 @@ export function VerifySignatureWorkspace({
           <VerificationResultHeader t={t} report={report} />
         ) : null}
 
+        {/*
+          Năm thẻ cấp tài liệu là kết quả XẤU NHẤT trên mọi chữ ký. Bộ thẻ riêng
+          của từng chữ ký nay nằm trong modal chi tiết, nên đây là kết luận duy
+          nhất trên trang chính — hiện cả khi tài liệu chỉ có một chữ ký.
+        */}
+        {phase === "done" && report && report.primaryChecks.length > 0 ? (
+          <section className="rounded-lg border border-border bg-surface p-5 shadow-sm">
+            <SectionHeading title={t.verify.primaryChecks.documentTitle} />
+            <p className="mt-1 text-[11.5px] leading-relaxed text-fg-muted">
+              {t.verify.primaryChecks.documentDescription}
+            </p>
+            <PrimaryChecksPanel t={t} checks={report.primaryChecks} />
+          </section>
+        ) : null}
+
         {phase === "done" && report && report.signatures.length === 0 ? (
           <NoSignaturesState
             t={t}
@@ -117,21 +142,23 @@ export function VerifySignatureWorkspace({
             onAllowlistReverify={handleAllowlistReverify}
           />
         ) : null}
-
-        {phase === "done" && report && selectedSignature ? (
-          <VerificationInspector
-            t={t}
-            report={report}
-            signature={selectedSignature}
-            view={view}
-            onViewChange={setView}
-            advancedSection={advancedSection}
-            onAdvancedSectionChange={setAdvancedSection}
-            canManageAllowlist={canManageAllowlist}
-            onAllowlistReverify={handleAllowlistReverify}
-          />
-        ) : null}
       </main>
+
+      {report ? (
+        <SignatureDetailDialog
+          t={t}
+          report={report}
+          signature={selectedSignature}
+          open={detailOpen}
+          onClose={() => setDetailOpen(false)}
+          view={view}
+          onViewChange={setView}
+          advancedSection={advancedSection}
+          onAdvancedSectionChange={setAdvancedSection}
+          canManageAllowlist={canManageAllowlist}
+          onAllowlistReverify={handleAllowlistReverify}
+        />
+      ) : null}
     </div>
   );
 }

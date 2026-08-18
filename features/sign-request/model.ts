@@ -114,6 +114,31 @@ export interface SignatureSlot {
   id: string;
   /** Chưa gán ai — ô vẫn tồn tại để giữ chỗ, nhưng chặn việc tạo yêu cầu. */
   signer?: SlotSigner;
+  /**
+   * Tên VAI khi ô này đến từ một mẫu: "Kế toán trưởng", "Bên A".
+   *
+   * Ô trống của một mẫu không phải ô trống bình thường — nó đã biết chỗ ký này
+   * dùng để làm gì, chỉ chưa biết ai đứng vào. Giữ lại nhãn đó là khác biệt giữa
+   * "Chọn người ký" và "Kế toán trưởng — chưa chọn ai".
+   */
+  roleName?: string;
+  /**
+   * `code` của vai trong mẫu đã publish — thứ `POST /api/signing-requests` dùng
+   * để biết ô này ứng với vai nào.
+   *
+   * Khác `roleName` ở chỗ nó là ĐỊNH DANH chứ không phải nhãn: nhãn đổi được và
+   * dịch được, mã thì phải khớp từng ký tự với bản đã publish.
+   */
+  roleCode?: string;
+  /**
+   * Số khung chữ ký mà vai này có trên tài liệu, khi mẫu đặt nhiều hơn một
+   * (ví dụ ký cả trang đầu lẫn trang cuối).
+   *
+   * Chỉ để hiển thị. Sơ đồ vẫn vẽ một ô cho một vai vì "ai ký, sau ai" là câu
+   * hỏi của màn này, còn vị trí thì bản đã publish quyết định — yêu cầu ký từ
+   * mẫu KHÔNG gửi toạ độ lên, backend tự chép.
+   */
+  slotCount?: number;
   config: SlotConfig;
   /** Thời điểm ký, chỉ có sau khi yêu cầu đã chạy. ISO 8601. */
   signedAt?: string;
@@ -147,13 +172,47 @@ export interface SignRequestDraft {
   steps: FlowStep[];
 }
 
+/**
+ * Một yêu cầu ký ĐÃ PHÁT.
+ *
+ * Nó là hợp của hai nguồn, và ranh giới giữa chúng là thứ phải nhớ khi đọc file
+ * này:
+ *
+ * - Phần đến từ **máy chủ**: `signingRequestId`, `serverStatus`, và trạng thái
+ *   đã ký của từng ô (`signedAt`/`declinedAt`, do `mergeServerSigners` đắp vào
+ *   cây bước). Đây là sự thật; màn tiến trình đọc lại nó bằng
+ *   `GET /api/signing-requests/{id}`.
+ * - Phần **chỉ sống ở client**: lời nhắn, hạn ký, cờ nhắc nhở, luật ALL/ANY của
+ *   bước, và cấu hình ký của từng ô (phương thức, thuật toán, mức baseline).
+ *   `POST /api/signing-requests` không có trường nào chở chúng, nên chúng không
+ *   đi đâu cả — giữ lại để màn tiến trình hiển thị đúng thứ người soạn đã chọn,
+ *   và để bước ký thật (`POST /api/v1/sign`) dùng về sau.
+ *
+ * Không trộn lẫn hai phần: mọi thứ ở nhóm sau sẽ MẤT nếu người dùng tải lại
+ * trang, còn nhóm trước thì không.
+ */
 export interface SignRequestRecord extends SignRequestDraft {
-  code: string;
+  /** UUID do backend cấp. Cũng là mã hiển thị — dịch vụ không sinh mã ngắn nào. */
+  signingRequestId: string;
   createdAt: string;
   documentName: string;
   documentSize: number;
   documentFormat?: DocumentFormat;
-  cancelledAt?: string;
+  sourceType: "TEMPLATE_PREVIEW" | "UPLOADED_DOCUMENT";
+  /** Trạng thái mới nhất đọc được từ máy chủ. */
+  serverStatus: "DRAFT" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED";
+  /**
+   * Mẫu đã dùng và giá trị đã điền, chụp lại tại thời điểm phát yêu cầu.
+   *
+   * Chép TÊN mẫu chứ không chỉ id: mẫu sửa được và ngừng phục vụ được, còn yêu
+   * cầu đã phát thì phải đọc được mãi. Một bản ghi trỏ tới id của mẫu đã đổi là
+   * một bản ghi không giải thích được nữa.
+   */
+  templateId?: string;
+  templateName?: string;
+  variableValues?: Record<string, string>;
+  /** Cảnh báo do `POST /previews` trả về — biến thiếu, biến thừa. */
+  previewWarnings?: string[];
 }
 
 /* ------------------------------------------------------------------ *
@@ -274,10 +333,21 @@ export function slotStatus(
 
 export type RequestStatus = "completed" | "declined" | "cancelled" | "running";
 
+/**
+ * Trạng thái hiển thị, suy từ trạng thái của MÁY CHỦ chứ không từ việc đếm chữ
+ * ký ở client.
+ *
+ * Hai chỗ hai bên không trùng nhau, và máy chủ đúng: nó biết `COMPLETED` nghĩa
+ * là mọi người ký BẮT BUỘC đã ký, còn client đếm hết mọi ô. `declined` không có
+ * trong enum của backend (yêu cầu vẫn `IN_PROGRESS` khi một người từ chối), nên
+ * nó được suy thêm từ trạng thái của từng người ký — người dùng cần thấy quy
+ * trình đang tắc, chứ không phải "đang chạy".
+ */
 export function requestStatus(record: SignRequestRecord): RequestStatus {
-  if (record.cancelledAt) return "cancelled";
+  if (record.serverStatus === "CANCELLED") return "cancelled";
+  if (record.serverStatus === "COMPLETED") return "completed";
   if (hasDecline(record.steps)) return "declined";
-  return activeStepIndex(record.steps) === -1 ? "completed" : "running";
+  return "running";
 }
 
 /* ------------------------------------------------------------------ *
@@ -294,7 +364,8 @@ export type DraftIssueCode =
   | "EMPTY_STEP"
   | "SLOT_WITHOUT_SIGNER"
   | "LINK_WITHOUT_EMAIL"
-  | "DUPLICATE_IN_STEP";
+  | "DUPLICATE_IN_STEP"
+  | "MISSING_VARIABLE";
 
 export interface DraftIssue {
   code: DraftIssueCode;
@@ -303,6 +374,8 @@ export interface DraftIssue {
   slotId?: string;
   /** Tên người ký bị trùng — chỉ dùng cho `DUPLICATE_IN_STEP`. */
   signerName?: string;
+  /** Nhãn biến còn trống — chỉ dùng cho `MISSING_VARIABLE`. */
+  variableLabel?: string;
 }
 
 export function validateDraft(draft: SignRequestDraft, document?: File): DraftIssue[] {
@@ -471,38 +544,89 @@ export function moveSlot(
 }
 
 /* ------------------------------------------------------------------ *
- * Mô phỏng tiến trình (chỉ dành cho bản dựng giao diện)
+ * Đắp trạng thái của máy chủ vào cây bước
  * ------------------------------------------------------------------ */
 
-/**
- * Ký hộ ô tiếp theo đang tới lượt, để xem tiến trình chuyển trạng thái mà không
- * cần dịch vụ thật. Không có gì ở đây được dùng lại khi nối vào backend — lúc đó
- * trạng thái đến từ máy chủ.
- */
-export function simulateNextSignature(steps: FlowStep[]): FlowStep[] {
-  const active = activeStepIndex(steps);
-  if (active === -1) return steps;
-
-  const step = steps[active];
-  const target = step.slots.find((slot) => !slot.signedAt && !slot.declinedAt);
-  if (!target) return steps;
-
-  return updateSlot(steps, target.id, { signedAt: new Date().toISOString() });
+/** Đúng phần `signers[]` của `GET /api/signing-requests/{id}` mà hàm dưới cần. */
+export interface ServerSignerStatus {
+  roleCode: string | null;
+  userId: string;
+  signingOrder: number;
+  status: "PENDING" | "SIGNED" | "DECLINED";
+  signedAt: string | null;
 }
 
-export function resetProgress(steps: FlowStep[]): FlowStep[] {
-  return steps.map((step) => ({
+/**
+ * Ghép trạng thái từ máy chủ lên cây bước đang giữ ở client.
+ *
+ * Vì sao phải ghép thay vì dựng lại cây từ response: response chỉ có
+ * `signers[]` phẳng với `signingOrder`, không có tên bước, không có luật
+ * ALL/ANY, không có cấu hình ký — những thứ đó chưa bao giờ được gửi lên. Dựng
+ * lại từ response là vứt đi một nửa thứ người soạn đã chọn.
+ *
+ * Ghép theo hai khoá, theo đúng cách yêu cầu đã được tạo ra:
+ * - Nguồn từ mẫu: theo `roleCode`. Vai là định danh ổn định của một chỗ ký.
+ * - Tài liệu tự tải lên: theo CẤP KÝ + `userId`, vì tài liệu trần không có vai
+ *   nào. Một người ký hai lần ở hai bước khác nhau là hợp lệ, nên chỉ `userId`
+ *   thôi thì không đủ phân biệt.
+ *
+ * Cấp ký lấy bằng cách gom `signingOrder` của response rồi sắp tăng dần, và bước
+ * thứ N của cây client ứng với cấp thứ N. KHÔNG so `stepIndex + 1` thẳng với
+ * `signingOrder`: giá trị đọc về là giá trị ĐÃ NÉN của backend, không phải giá
+ * trị client gửi lên, nên hai con số đó không có gì bảo đảm bằng nhau.
+ *
+ * Ô không khớp được với người ký nào giữ nguyên trạng thái cũ — thà hiện "chưa
+ * ký" cho một ô đã ký còn hơn gán nhầm chữ ký của người này sang người khác.
+ */
+export function mergeServerSigners(
+  steps: FlowStep[],
+  signers: ServerSignerStatus[],
+): FlowStep[] {
+  const byRole = new Map<string, ServerSignerStatus>();
+  const byOrderAndUser = new Map<string, ServerSignerStatus>();
+  for (const signer of signers) {
+    if (signer.roleCode) byRole.set(signer.roleCode, signer);
+    byOrderAndUser.set(`${signer.signingOrder}|${signer.userId}`, signer);
+  }
+
+  /* Các cấp ký của máy chủ, tăng dần: phần tử thứ N là cấp của bước thứ N. */
+  const levels = [...new Set(signers.map((signer) => signer.signingOrder))].sort(
+    (left, right) => left - right,
+  );
+
+  return steps.map((step, stepIndex) => ({
     ...step,
-    slots: step.slots.map((slot) => ({
-      id: slot.id,
-      signer: slot.signer,
-      config: slot.config,
-    })),
+    slots: step.slots.map((slot) => {
+      const userId = signerIdOf(slot);
+      const level = levels[stepIndex];
+      const match =
+        (slot.roleCode ? byRole.get(slot.roleCode) : undefined) ??
+        (userId && level !== undefined
+          ? byOrderAndUser.get(`${level}|${userId}`)
+          : undefined);
+      if (!match) return slot;
+
+      return {
+        ...slot,
+        signedAt: match.status === "SIGNED" ? (match.signedAt ?? undefined) : undefined,
+        declinedAt:
+          match.status === "DECLINED" ? (match.signedAt ?? new Date(0).toISOString()) : undefined,
+      };
+    }),
   }));
 }
 
-/** Mã yêu cầu hiển thị trên màn tiến trình — dạng `SR-2026-0731`. */
-export function makeRequestCode(now = new Date()): string {
-  const serial = Math.floor(1000 + Math.random() * 9000);
-  return `SR-${now.getFullYear()}-${serial}`;
+/**
+ * Định danh gửi lên trong `signers[].userId`.
+ *
+ * Người ngoài hệ thống không có tài khoản, nên địa chỉ email đóng vai định danh.
+ * Backend chỉ đòi một chuỗi ≤128 ký tự và không tra cứu nó ở đâu cả — với dịch
+ * vụ chưa có xác thực thì email là chuỗi duy nhất còn phân biệt được người này
+ * với người kia.
+ */
+export function signerIdOf(slot: SignatureSlot): string | undefined {
+  const signer = slot.signer;
+  if (!signer) return undefined;
+  const value = (signer.userId ?? signer.email).trim();
+  return value ? value.slice(0, 128) : undefined;
 }

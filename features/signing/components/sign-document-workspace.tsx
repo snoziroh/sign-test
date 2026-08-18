@@ -106,6 +106,8 @@ import {
   listAgentCertificates,
 } from "../usb-token-agent";
 import { mergeUsbTokenSource } from "../usb-token-source";
+import { documentUsbTokenTransport } from "../usb-token-transport";
+import { ConfigCard, Field, Pkcs12Card, SourcePicker } from "./credential-cards";
 import { SignSessionDialog } from "./sign-session-dialog";
 import { SignStepProgress, type SignStepView } from "./sign-step-progress";
 import { UsbTokenSignDialog } from "./usb-token-sign-dialog";
@@ -581,8 +583,10 @@ export function SignDocumentWorkspace() {
     setResume(null);
     setDialog({
       source: active,
+      // Bản ghi của màn `/sign` luôn có `sessionId` — trường này chỉ tuỳ chọn để
+      // dùng chung kiểu được với luồng công khai (phiên sống trong cookie).
       begin: () =>
-        submitSignStep(buildContinueRequest(record.materialMode, record.sessionId)),
+        submitSignStep(buildContinueRequest(record.materialMode, record.sessionId!)),
     });
   }
 
@@ -701,7 +705,10 @@ export function SignDocumentWorkspace() {
           agreementReady={agreementStage === "READY"}
           begin={dialog.begin}
           continueSession={(sessionId) =>
-            submitSignStep(buildContinueRequest(dialog.source.materialMode, sessionId))
+            // Luôn có ở đây: hộp thoại chỉ gọi lại khi đã có phiên đang mở (REDIRECT_OTP
+            // luôn trả `sessionId`), tham số tuỳ chọn chỉ để dùng chung được với luồng
+            // công khai — nơi phiên sống trong cookie, không có `sessionId`.
+            submitSignStep(buildContinueRequest(dialog.source.materialMode, sessionId!))
           }
           onPending={(response) => {
             rememberSession(response, dialog.source, file?.name);
@@ -717,8 +724,7 @@ export function SignDocumentWorkspace() {
           t={t}
           fileName={usbDialog.file.name}
           sourceName={sourceLabel(usbDialog.source)}
-          file={usbDialog.file}
-          request={usbDialog.request}
+          transport={documentUsbTokenTransport(usbDialog.file, usbDialog.request)}
           catalog={catalog}
           onCompleted={applyCompleted}
           onClose={() => setUsbDialog(undefined)}
@@ -933,7 +939,16 @@ function ConfigurationPanel(props: ConfigurationPanelProps) {
 
       {step === "credential" && source && form ? (
         <>
-          {isPkcs12(source) ? <Pkcs12Card {...props} source={source} form={form} /> : null}
+          {isPkcs12(source) ? (
+            <Pkcs12Card
+              copy={t.sign.pkcs12}
+              form={form}
+              p12File={props.p12File}
+              p12InputRef={props.p12InputRef}
+              onP12FileChange={props.onP12FileChange}
+              onUpdate={props.onUpdate}
+            />
+          ) : null}
           {isMpki(source) ? <MpkiCard {...props} source={source} form={form} /> : null}
           {isSignCloud(source) ? <SignCloudCard {...props} source={source} form={form} /> : null}
           {isUsbToken(source) ? <UsbTokenCard t={t} /> : null}
@@ -1047,10 +1062,12 @@ function SourceCard({
         <p className="text-[11.5px] text-fg-muted">{t.sign.source.empty}</p>
       ) : (
         <SourcePicker
-          t={t}
+          copy={{ unsupportedForFormat: t.sign.source.unsupportedForFormat }}
           sources={capabilities.sources}
           selectedId={form?.sourceId}
           documentFormat={documentFormat}
+          sourceLabel={sourceLabel}
+          supportsFormat={supportsFormat}
           onChange={onSourceChange}
         />
       )}
@@ -1172,123 +1189,6 @@ function SignAction({
   );
 }
 
-/**
- * Nguồn không ký được định dạng đang chọn vẫn hiện ra, chỉ bị khoá kèm lý do —
- * ẩn hẳn thì người dùng không phân biệt được "nguồn không tồn tại" với "nguồn
- * không hợp với file này".
- */
-function SourcePicker({
-  t,
-  sources,
-  selectedId,
-  documentFormat,
-  onChange,
-}: {
-  t: Dictionary;
-  sources: SignatureSource[];
-  selectedId?: string;
-  documentFormat?: DocumentFormat;
-  onChange: (sourceId: string) => void;
-}) {
-  return (
-    <div className="space-y-1.5">
-      {sources.map((source) => {
-        const usable = !documentFormat || supportsFormat(source, documentFormat);
-        const selected = source.id === selectedId;
-        return (
-          <button
-            key={source.id}
-            type="button"
-            onClick={() => onChange(source.id)}
-            aria-pressed={selected}
-            className={`w-full rounded-md border p-2.5 text-left ${
-              selected ? "border-accent bg-accent-subtle" : "border-border bg-surface"
-            } ${usable ? "" : "opacity-60"}`}
-          >
-            <p className="text-[12.5px] font-semibold text-fg">{sourceLabel(source)}</p>
-            <p className="mt-0.5 text-[10.5px] text-fg-muted">
-              {source.documentFormats.join(" · ")}
-            </p>
-            {!usable && documentFormat ? (
-              <p className="mt-1 text-[10.5px] text-warning">
-                {t.sign.source.unsupportedForFormat(documentFormat)}
-              </p>
-            ) : null}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
-/**
- * Khoá riêng không bao giờ rời khỏi máy chủ ký: file .p12 đi thẳng từ trình
- * duyệt qua proxy tới service, và mật khẩu chỉ nằm trong part `request` của
- * đúng lần gọi đó — không lưu, không autofill.
- */
-function Pkcs12Card({
-  t,
-  form,
-  p12File,
-  p12InputRef,
-  onP12FileChange,
-  onUpdate,
-}: ConfigurationPanelProps & { source: SignatureSource; form: SignFormState }) {
-  const p = t.sign.pkcs12;
-  return (
-    <ConfigCard title={p.title}>
-      <div className="space-y-3">
-        <div>
-          <label className="mb-1.5 block text-[11px] font-semibold text-fg-muted">
-            {p.fileLabel}
-          </label>
-          <input
-            ref={p12InputRef}
-            type="file"
-            accept=".p12,.pfx"
-            className="sr-only"
-            onChange={(event) => onP12FileChange(event.target.files?.[0])}
-          />
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => p12InputRef.current?.click()}
-              className="h-8.5 shrink-0 rounded-md border border-border bg-surface px-3 text-[11.5px] font-semibold text-fg"
-            >
-              {p.chooseFile}
-            </button>
-            <span className="min-w-0 truncate text-[11px] text-fg-muted">
-              {p12File ? `${p12File.name} · ${formatBytes(p12File.size)}` : p.noFile}
-            </span>
-          </div>
-        </div>
-
-        <Field label={p.passwordLabel} htmlFor="p12-password">
-          <input
-            id="p12-password"
-            type="password"
-            value={form.p12Password}
-            autoComplete="off"
-            placeholder={p.passwordPlaceholder}
-            onChange={(event) => onUpdate("p12Password", event.target.value)}
-            className="h-9 w-full rounded-md border border-border bg-surface px-2 text-[12px] text-fg"
-          />
-        </Field>
-
-        <Field label={p.aliasLabel} htmlFor="p12-alias">
-          <input
-            id="p12-alias"
-            value={form.p12Alias}
-            placeholder={p.aliasPlaceholder}
-            onChange={(event) => onUpdate("p12Alias", event.target.value)}
-            className="h-9 w-full rounded-md border border-border bg-surface px-2 text-[12px] text-fg"
-          />
-          <p className="mt-1.5 text-[10.5px] text-fg-muted">{p.aliasHint}</p>
-        </Field>
-      </div>
-    </ConfigCard>
-  );
-}
 
 function MpkiCard({
   t,
@@ -2272,34 +2172,6 @@ function TargetSignaturePicker({
       />
       <p className="mt-1.5 text-[10.5px] leading-relaxed text-fg-muted">{g.hint}</p>
     </div>
-  );
-}
-
-function Field({
-  label,
-  htmlFor,
-  children,
-}: {
-  label: string;
-  htmlFor?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div>
-      <label className="mb-1.5 block text-[11px] font-semibold text-fg-muted" htmlFor={htmlFor}>
-        {label}
-      </label>
-      {children}
-    </div>
-  );
-}
-
-function ConfigCard({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <article className="rounded-lg border border-border bg-surface p-4 shadow-sm">
-      <h3 className="mb-3 text-[13px] font-semibold text-fg">{title}</h3>
-      {children}
-    </article>
   );
 }
 

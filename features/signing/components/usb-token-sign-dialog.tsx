@@ -4,8 +4,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Dialog } from "@/components/ui/dialog";
 import { CheckIcon, ChevronLeftIcon, ChevronRightIcon } from "@/components/ui/icons";
 import type { Dictionary } from "@/lib/i18n";
-import type { SignResponse, UsbTokenJob, UsbTokenJobRequest } from "@/lib/types/signing";
-import { completeUsbTokenJob, createUsbTokenJob } from "../sign-api";
+import type { SignResponse, UsbTokenJob } from "@/lib/types/signing";
+import type { UsbTokenTransport } from "../usb-token-transport";
 import {
   certificateLabel,
   FptAgentError,
@@ -51,6 +51,11 @@ import { agentCanSign } from "../usb-token-source";
  *
  * Hộp thoại KHÔNG tự chạy lại bất cứ chặng nào. Job dùng một lần, nên "thử lại"
  * luôn là làm lại từ đầu: job mới, và một lần nhập PIN nữa.
+ *
+ * Hai lời gọi mạng của chặng 3 và 5 đến từ `transport`, không gọi thẳng ở đây:
+ * ký một tệp rời (`/sign`, `/external-sign`) và ký một ô của quy trình dùng hai
+ * cặp endpoint khác nhau, còn năm chặng thì y hệt. Xem
+ * `features/signing/usb-token-transport.ts`.
  */
 
 type UsbTokenPhase =
@@ -64,12 +69,12 @@ interface UsbTokenSignDialogProps {
   t: Dictionary;
   fileName?: string;
   sourceName: string;
-  file: File;
   /**
-   * Thiếu `signerDisplayName` — CỐ Ý. Hộp thoại điền nó bằng CN của chứng thư
-   * người ký vừa chọn; màn hình cấu hình không có ô nào cho tên người ký nữa.
+   * Hai endpoint của lần ký này. Chốt lúc bấm ký — dựng lại mỗi render cũng vô
+   * hại (không nằm trong deps của effect nào), nhưng phần dữ liệu nó đóng gói
+   * thì phải là bản đã chốt.
    */
-  request: Omit<UsbTokenJobRequest, "signerDisplayName">;
+  transport: UsbTokenTransport;
   /** Nhãn thuật toán của backend — xem `signature-algorithm.ts`. */
   catalog?: AlgorithmCatalog;
   onCompleted: (response: SignResponse) => void;
@@ -80,8 +85,7 @@ export function UsbTokenSignDialog({
   t,
   fileName,
   sourceName,
-  file,
-  request,
+  transport,
   catalog,
   onCompleted,
   onClose,
@@ -192,8 +196,9 @@ export function UsbTokenSignDialog({
     setError(undefined);
     try {
       /*
-        Tên người ký lấy THẲNG từ chứng thư: CN, và chỉ khi CN rỗng mới rơi về
-        subject DN. Không có đường nào khác đưa tên vào đây — màn hình cấu hình
+        Chứng thư đi thẳng xuống `transport`: tên trên chữ ký là CN của nó (luồng
+        `/sign` gửi kèm `signerDisplayName`, luồng quy trình để backend tự đọc từ
+        chứng thư). Không có đường nào khác đưa tên vào đây — màn hình cấu hình
         không còn ô nhập, nên chữ ký không thể mang một tên không được CA chứng
         nhận.
       */
@@ -201,10 +206,7 @@ export function UsbTokenSignDialog({
 
       if (!prepared) {
         setPhase("PREPARING");
-        prepared = await createUsbTokenJob(file, {
-          ...request,
-          signerDisplayName: certificate.commonName?.trim() || certificate.subjectDN,
-        });
+        prepared = await transport.prepare(certificate);
         setJob({ value: prepared, thumbprint: certificate.thumbprint });
 
         /*
@@ -242,7 +244,7 @@ export function UsbTokenSignDialog({
       });
 
       setPhase("COMPLETING");
-      const response = await completeUsbTokenJob(prepared.jobId, {
+      const response = await transport.complete(prepared.jobId, {
         signatureBase64: signature,
         certificateBase64: certificate.base64Encode,
       });

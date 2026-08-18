@@ -29,7 +29,8 @@ export function MobileNavigationDialog({
       <nav aria-label={t.nav.primaryLabel}>
         <ul className="flex flex-col gap-1">
           {SCREEN_ROUTES.map((route) => {
-            const active = pathname === route.href;
+            /* Đường dẫn con cũng làm mục cha sáng — xem `ScreenNav`. */
+            const active = pathname === route.href || pathname.startsWith(`${route.href}/`);
 
             return (
               <li key={route.href}>

@@ -769,6 +769,28 @@ export const en = {
    * thứ tự nào), không nói về một lần ký cụ thể — phần đó thuộc `sign`.
    */
   signRequest: {
+    /**
+     * Danh tính người thao tác — giá trị của `X-Username`. Câu chữ ở đây phải
+     * nói rõ nó KHÔNG phải đăng nhập: dịch vụ không xác thực gì cả, nên gõ tên
+     * ai vào cũng được, và đó chính là điều người test cần biết.
+     */
+    actor: {
+      title: "Acting as",
+      description:
+        "Every workflow endpoint requires an X-Username header. The signing service has no authentication, so this is simply the name the request is filed under — and the name that decides who may read the document afterwards.",
+      label: "Username",
+      placeholder: "user123",
+      hint: "Up to 128 characters. Nothing is verified — no account is created or checked.",
+      accessNote:
+        "The document of a signing request is readable only by the user who created it and the users named as signers. Change this name and you may lose access to requests created under the previous one.",
+      buttonTitle: "Change who the requests are filed under",
+      unset: "No identity",
+      save: "Save",
+      savedTitle: "Identity saved",
+      required: "Pick an identity before creating the request.",
+      requiredHint:
+        "Use the identity button in the page header. Without X-Username the service rejects every call on this screen.",
+    },
     steps: {
       navLabel: "Request steps",
       stepOf: (current: number, total: number) => `Step ${current} of ${total}`,
@@ -781,7 +803,7 @@ export const en = {
       },
       flow: {
         label: "Signing flow",
-        description: "Drag people into steps. Everyone inside one step signs in parallel; each later step counter-signs what came before.",
+        description: "Add signers to each step. Everyone inside one step signs in parallel; each later step will sign on the file with earlier step signatures.",
       },
       review: {
         label: "Review",
@@ -801,7 +823,7 @@ export const en = {
       size: "Size",
       unknownFormat: "Unknown",
       previewTitle: "Preview",
-      previewEmpty: "Choose a document to see it here.",
+      previewEmpty: "Upload a document to see it here.",
       pdfOnlyPreview: "Only PDF renders a preview on this screen — the signing flow works the same for every supported format.",
       boundaryTitle: "Where the file goes",
       boundaryText:
@@ -836,10 +858,12 @@ export const en = {
           count === 1
             ? `Signs over 1 signature from the ${steps === 1 ? "previous step" : `${steps} previous steps`}.`
             : `Signs over ${count} signatures from the ${steps === 1 ? "previous step" : `${steps} previous steps`}.`,
+        parallelStep: (n: number) => `${n} signatures in parallel`,
         ruleLabel: "Completion",
         ruleAll: "Everyone",
         ruleAny: "Anyone",
-        ruleAllHint: "Every signer in this step must sign before the next step opens.",
+        ruleAllHint:
+          "Everyone in this step signs at the same time, and all of them must sign before the next step opens.",
         ruleAnyHint: "One signature is enough to open the next step.",
         moveUp: (index: number) => `Move step ${index} up`,
         moveDown: (index: number) => `Move step ${index} down`,
@@ -851,14 +875,17 @@ export const en = {
         dropIntoStep: "Drop here",
         newStepDrop: "Drop a person here to open a new step",
         emptyStep: "No signer yet",
-        emptyStepHint: "Drag someone in from the left, or press Add signer.",
+        emptyStepHint: "Press Add signer to put someone on this step.",
         signatureCount: (count: number) => (count === 1 ? "1 signature" : `${count} signatures`),
         thenLabel: "then",
+        /* Luồng khoá cấu trúc — nói LÝ DO, không chỉ nói trạng thái. */
+        fromTemplate: "Set by the template",
       },
 
       slot: {
         unassigned: "Pick a signer",
         unassignedHint: "This box is reserved but nobody is on it yet.",
+        roleHint: "From a template — pick who signs here.",
         configure: (name: string) => `Configure ${name}'s signature`,
         remove: (name: string) => `Remove ${name} from this step`,
         removeEmpty: "Remove this empty signature box",
@@ -868,6 +895,7 @@ export const en = {
         invisible: "Invisible",
         pageLabel: (page: number) => `Page ${page}`,
         incomplete: "Needs attention",
+        slotCount: (count: number) => `${count} boxes`,
       },
 
       summary: {
@@ -934,6 +962,10 @@ export const en = {
       pageOf: (current: number, total: number) => `Page ${current} / ${total}`,
       previousPage: "Previous page",
       nextPage: "Next page",
+      currentPage: "Current page",
+      zoomOut: "Zoom out",
+      zoomIn: "Zoom in",
+      fitWidth: "Fit width",
       otherSignerBox: (name: string) => `${name} — same page`,
       renderFailed: (error: string) => `Unable to display the PDF: ${error}`,
     },
@@ -967,11 +999,17 @@ export const en = {
         LINK_WITHOUT_EMAIL: (index: number) => `A link signer in step ${index} has no email address.`,
         DUPLICATE_IN_STEP: (index: number, name: string) =>
           `${name} appears twice in step ${index}. Two parallel signatures from one person add nothing.`,
+        MISSING_VARIABLE: (label: string) => `“${label}” has not been filled in.`,
       },
       goToStep: (index: number) => `Go to step ${index}`,
       submit: "Create signing request",
       submitting: "Creating…",
       backToFlow: "Back to the flow",
+      submitFailed: "The signing request was not created",
+      retryNote:
+        "Pressing the button again reuses the same idempotency key, so a request that was in fact created will be returned rather than duplicated.",
+      localOnlyNote:
+        "Only the name, the document and the signers are sent to the service. The deadline, the message and the two switches above have no field in the API — they stay in this browser and are lost on reload.",
     },
 
     progress: {
@@ -1000,8 +1038,6 @@ export const en = {
         declined: "Declined",
       },
       signedAt: (value: string) => `Signed ${value}`,
-      copyLink: "Copy signing link",
-      linkCopied: "Signing link copied",
       download: "Download document",
       cancelRequest: "Cancel request",
       newRequest: "New request",
@@ -1012,11 +1048,933 @@ export const en = {
       timelineCompleted: "All signatures collected",
       timelineWaiting: (name: string) => `Waiting for ${name}`,
 
-      demoTitle: "Prototype controls",
-      demoHint: "No signing service is behind this screen. These buttons move the flow so the states can be reviewed.",
-      demoSign: "Simulate next signature",
-      demoReset: "Reset progress",
-      demoDone: "Nothing left to sign",
+      refresh: "Refresh",
+      refreshFailed: "Could not read the latest status",
+      downloadFailed: "Could not download the document",
+      previewWarnings: "Warnings while building the document",
+      linkIssuedInDetail:
+        "Signing links are issued per signer from the workflow detail screen — that is the only place with the signer IDs the service needs.",
+      linkOpenDetail: "Manage signing links",
+      localOnlyTitle: "Not stored on the server",
+      localOnlyHint:
+        "The deadline, the message, the reminder switches, the step rule and each box's signing configuration have no field in the create-request API. They are shown from this browser's memory and disappear on reload — the signatures and the statuses come from the service.",
+    },
+
+    /**
+     * Danh sách quy trình đã tạo và màn chi tiết mở từ đó.
+     *
+     * Khác `progress` ở LỐI VÀO chứ không ở nội dung: `progress` là màn hiện ra
+     * ngay sau khi tạo yêu cầu, còn phần này là đường quay lại nó về sau — kể cả
+     * từ một máy khác, kể cả bởi người ký chứ không phải người tạo. Câu chữ vì
+     * thế phải đứng được một mình, không nhắc tới "vừa xong".
+     */
+    workflows: {
+      tabs: {
+        label: "Signing request sections",
+        list: "Workflows",
+        create: "New request",
+      },
+
+      list: {
+        title: "Workflows",
+        description:
+          "Requests you created and requests where you are named as a signer. The service decides which ones by reading X-Username — nothing else.",
+        refresh: "Refresh",
+        create: "New request",
+        searchLabel: "Search workflows",
+        searchPlaceholder: "Search by title",
+        statusLabel: "Status",
+        relationLabel: "My part",
+        allStatuses: "Every status",
+        allRelations: "Everything",
+        status: {
+          DRAFT: "Draft",
+          IN_PROGRESS: "In progress",
+          COMPLETED: "Completed",
+          CANCELLED: "Cancelled",
+        },
+        relation: {
+          CREATOR: "I created it",
+          SIGNER: "I sign it",
+          CREATOR_AND_SIGNER: "I created and sign it",
+        },
+        source: {
+          TEMPLATE_PREVIEW: "From a template",
+          UPLOADED_DOCUMENT: "Uploaded file",
+        },
+        createdBy: (name: string) => `by ${name}`,
+        createdAt: (value: string) => `Created ${value}`,
+        updatedAt: (value: string) => `Updated ${value}`,
+        count: (total: number) => (total === 1 ? "1 workflow" : `${total} workflows`),
+        pageOf: (page: number, total: number) => `Page ${page} of ${total}`,
+        prev: "Previous",
+        next: "Next",
+        empty: "No workflow yet",
+        emptyHint:
+          "Requests you create, and requests where somebody named you as a signer, show up here. Start one from the New request tab.",
+        noResults: "No workflow matches those filters.",
+        noResultsHint:
+          "Search and status are handled by the service; “my part” only narrows the page you are looking at, because the API has no parameter for it.",
+        relationFilterNote: "Applied to this page only — the API has no parameter for it.",
+        loadFailed: "Could not load the workflows",
+        retry: "Try again",
+        actorRequired: "Pick an identity first",
+        actorRequiredHint:
+          "The list is built from the X-Username header — the service has no other way to know whose workflows to return. Use the identity button in the page header.",
+        open: "Open",
+      },
+
+      detail: {
+        back: "All workflows",
+        loading: "Opening the workflow…",
+        loadFailed: "Could not open this workflow",
+        loadFailedHint:
+          "A request is readable only by the user who created it and the users named as signers. Check the identity in the page header before assuming the request is gone.",
+        serverOnlyTitle: "Rebuilt from the service",
+        serverOnlyHint:
+          "Step names, the completion rule, the deadline and each box's signing configuration were never sent to the service, so they are not shown here. Everything on this screen comes from GET /api/signing-requests/{id}.",
+
+        assignment: {
+          title: "Your part",
+          none: "You are not a signer on this workflow.",
+          noneHint: "It is listed for you because you created it.",
+          stepLabel: (index: number) => `Step ${index}`,
+          waiting: "Waiting for your signature",
+          notYourTurn: "An earlier step has not finished signing yet.",
+          signed: (value: string) => `You signed ${value}`,
+          declined: "You declined this workflow.",
+          sign: "Sign now",
+          signFailed: "Could not start signing",
+          decline: "Decline",
+          lockedTitle: "Someone is signing right now",
+          lockedBody: "Wait for that signing attempt to finish before you can sign.",
+          lockedByBody: (holder: string) =>
+            `${holder} is signing right now. Wait for that attempt to finish before you can sign.`,
+        },
+
+        cancel: "Cancel workflow",
+        remind: "Send a reminder",
+        cancelConfirmTitle: "Cancel this workflow?",
+        cancelConfirmBody:
+          "This stops the workflow for everyone. Signers who have not signed yet will no longer be able to, and this cannot be undone.",
+        cancelConfirmAction: "Cancel workflow",
+        cancelConfirmDismiss: "Keep it running",
+        cancelDone: "Workflow cancelled",
+        cancelFailed: "Could not cancel the workflow",
+
+        declineConfirmTitle: "Decline this signature?",
+        declineConfirmBody:
+          "This stops the whole workflow for everyone, not just your part, and cannot be undone.",
+        declineConfirmAction: "Decline",
+        declineConfirmDismiss: "Keep it pending",
+        declineDone: "Declined",
+        declineFailed: "Could not decline",
+
+        /**
+         * Quản trị link ký ngoài hệ thống (§4 của tài liệu tích hợp).
+         *
+         * Người đọc ở đây là NGƯỜI TẠO yêu cầu — một người trong hệ thống — nên câu
+         * chữ được phép nói về `signerId`, endpoint và token. Đối lập hẳn với
+         * `externalSign.*`, nơi người đọc là khách.
+         */
+        links: {
+          title: "External signing links",
+          intro:
+            "One link per signer, for people without an account. Each link places exactly one signature and can only be used by the signer it was issued for.",
+          loading: "Reading links…",
+          noLink: "No link issued yet",
+          order: (position: number) => `Signer ${position}`,
+          tokenHintLabel: "Link identifier",
+
+          signerTurn: "It is their turn — a link can be issued now.",
+          signerWaiting: "An earlier signer has not finished yet.",
+          signerSigned: "Already signed.",
+          signerDeclined: "Declined to sign.",
+
+          status: {
+            ACTIVE: "Active",
+            EXPIRED: "Expired",
+            REVOKED: "Revoked",
+            CONSUMED: "Used",
+          },
+          expiresAt: (value: string) => `Expires ${value}`,
+          expiredAt: (value: string) => `Expired ${value}`,
+          revokedAt: (value: string) => `Revoked ${value}`,
+          consumedAt: (value: string) => `Signed ${value}`,
+
+          create: "Issue link",
+          recreate: "Issue a new link",
+          revoke: "Revoke",
+          copy: "Copy link",
+          hideUrl: "Hide",
+          history: (count: number) =>
+            count === 1 ? "1 earlier link" : `${count} earlier links`,
+
+          createTitle: "Issue a signing link",
+          createConfirm: "Issue link",
+          recreateTitle: "Issue a new signing link",
+          recreateConfirm: "Replace the link",
+          recreateWarning:
+            "Issuing a new link makes the current one stop working. If you have already sent it, the recipient will need the new link.",
+          expiryLabel: "Valid for",
+          expiry: {
+            default: "Service default",
+            h24: "24 hours",
+            d3: "3 days",
+            d7: "7 days",
+          },
+          expiryHint:
+            "Shorter is safer: anyone holding the link can sign as this signer until it expires.",
+
+          freshTitle: "Link — shown once",
+          foreignDomain: (origin: string) =>
+            `The link points at ${origin}, which is where the signing service is configured to publish its public page. Make sure that address actually serves the signing page before sending it.`,
+          freshHint:
+            "This address is not stored anywhere and cannot be shown again. Copy it and send it to the signer now; if you lose it, issue a new link.",
+
+          copyFailed: "Could not copy",
+          copyFailedHint: "Your browser blocked clipboard access. Select the address above and copy it manually.",
+          createFailed: "Could not issue the link",
+          createdWithoutUrl: "Link issued without an address",
+          createdWithoutUrlHint:
+            "The service created the link but returned no URL, so there is nothing to send. Check the create-link response before issuing another one.",
+          revoked: "Link revoked",
+          revokedHint: "It can no longer be used to sign. Issue a new link if the signer still needs one.",
+          revokeFailed: "Could not revoke the link",
+          loadFailed: "Could not read the links",
+
+          blockedRequestClosed: "This workflow is closed, so no new link can be issued.",
+          blockedSigned: "This signer has already signed.",
+          blockedDeclined: "This signer declined, so a link would not be usable.",
+          blockedNotTurn:
+            "Not their turn yet. The service refuses links for a signer who cannot sign — issue it once the earlier steps finish.",
+
+          endpointMissing: "This service has no link endpoints",
+          endpointMissingHint:
+            "GET/POST /api/signing-requests/{id}/signers/{signerId}/public-links and its revoke endpoint answered 404. Point the page at a service that has them, or turn on the build preview below to review the interface.",
+
+          previewToggle: "Build preview — fake links",
+          previewToggleHint:
+            "Fills this panel with links that live only in this page's memory. Use it to review the expired and used states, which real links only reach after time passes or somebody signs. Nothing is sent anywhere and nothing survives a reload.",
+          previewConsume: "Simulate: signer signed",
+          previewExpire: "Simulate: link expired",
+        },
+
+        /**
+         * Thao tác chưa có endpoint. Nói ra ĐÚNG endpoint còn thiếu và đúng chỗ
+         * phải sửa: người test bàn thử này cũng là người sẽ nối API vào.
+         */
+        missing: {
+          title: "This action has no endpoint yet",
+          remind:
+            "The service sends no notification of any kind. Fill ENDPOINTS.remind in features/sign-request/workflow-actions.ts once that endpoint exists.",
+        },
+      },
+
+      /**
+       * Trang ký một ô của quy trình — `/sign-request/workflows/{id}/sign`.
+       *
+       * Nhánh riêng chứ không nằm trong `detail` nữa: nó là câu chữ của MỘT
+       * TRANG, và trang đó có những thứ một hộp thoại chưa từng có (thanh tiến
+       * trình, màn chặn, khối tài liệu). Người đọc là người ký NỘI BỘ nên câu
+       * chữ được phép nói về quy trình và người soạn — khác `externalSign.*`,
+       * nơi người đọc là khách.
+       */
+      sign: {
+        title: "Sign your part",
+        subtitle: (signer: string, document: string) => `${signer} · ${document}`,
+        back: "Back to the workflow",
+
+        loading: "Opening your signing turn…",
+        loadFailed: "Could not open this signing turn",
+        retry: "Try again",
+
+        steps: {
+          navLabel: "Signing steps",
+          stepOf: (current: number, total: number) => `Step ${current} of ${total}`,
+          lockedHint: "Finish the earlier steps to unlock this one.",
+          review: {
+            label: "Read",
+            title: "Read the document",
+            description:
+              "This is the version you are about to sign. Later steps sign on top of it.",
+          },
+          method: {
+            label: "Method",
+            title: "How you sign",
+            description: "Pick the certificate you actually hold.",
+          },
+          credential: {
+            label: "Details",
+            title: "Certificate details",
+            description: "What the chosen method needs before it can reach a private key.",
+          },
+          sign: {
+            label: "Sign",
+            title: "Sign the document",
+            description: "Check it over, then sign.",
+          },
+        },
+
+        consent: {
+          checkbox: "I have read this document and agree to sign it",
+          hint:
+            "Your signature is applied to the version shown on the left, and it is recorded against your username.",
+          scrollNote: "Read the whole document before you sign — signing cannot be undone here.",
+        },
+
+        summary: {
+          title: "What you are signing",
+          documentLabel: "Document",
+          signerLabel: "Signing as",
+          stepLabel: "Step",
+          step: (index: number) => `Step ${index}`,
+          statusPending: "Awaiting your signature",
+          statusSigned: "Signed",
+          statusDeclined: "Declined",
+          checksumLabel: "Document checksum",
+          checksumHint:
+            "Compare it with the checksum shown on the workflow to be sure this is the same file.",
+        },
+
+        planTitle: "Where you sign",
+        planLoading: "Reading signature positions…",
+        planSummary: (count: number, pages: number[]) =>
+          `${count} signature ${count === 1 ? "slot" : "slots"} · ${
+            pages.length === 1 ? "page" : "pages"
+          } ${pages.join(", ")}`,
+        planEmpty: "The workflow placed no signature slot for you.",
+        planHint:
+          "Positions come from the workflow and cannot be changed here. The service reads them again when it signs.",
+        planFailed: "Could not read the signature positions",
+        planRetry: "Try again",
+
+        capabilitiesLoading: "Reading the available signing methods…",
+        capabilitiesFailed: "Could not read the signing methods",
+
+        methodTitle: "How you sign",
+        methodNote:
+          "These are the signature sources the service has enabled, plus USB Token. Picking USB Token needs the FPT-CA Signing Agent running on this very machine.",
+        credentialTitle: "Certificate details",
+
+        sourceLabel: "Signature source",
+        algorithmLabel: "Algorithm",
+        baselineLabel: "Baseline level",
+
+        action: {
+          needConsent: "Confirm you have read the document first.",
+          needMethod: "Pick how you want to sign.",
+          needFields: "Fill in what the chosen method needs.",
+          reloadingDocument: "Waiting for the new version of the document…",
+        },
+
+        sign: "Sign document",
+        signing: "Signing…",
+
+        failedTitle: "Signing did not go through",
+
+        staleTitle: "The document just changed",
+        staleBody:
+          "Someone else in your step signed first, so the document is now a different version. Nothing of yours was lost — press sign again.",
+
+        resumeTitle: "A signing attempt is still open",
+        resumeBody:
+          "Your previous attempt is still open on the signing service — usually because the page was reloaded midway. Continue that one instead of starting over; starting over only returns this same message.",
+        resumeUsbBody:
+          "You still have a signing attempt open, and the service allows only one at a time. A USB Token attempt cannot be resumed from here: finish it in the tab that started it, or wait for that session to expire (15 minutes) and sign again from the start.",
+        resume: "Continue signing",
+
+        signedTitle: "Signed",
+        signedBody:
+          "Your signature is now part of the workflow's document. Later steps will sign on top of this version.",
+
+        /** Màn chặn — mỗi lý do một câu trả lời khác nhau. */
+        blocked: {
+          title: "You cannot sign this right now",
+          NOT_A_SIGNER: {
+            title: "You are not a signer on this workflow",
+            body:
+              "This signing turn belongs to somebody else, or the identity in the page header is not the one the workflow named. Check the identity before assuming something is wrong.",
+          },
+          SIGNER_NOT_FOUND: {
+            title: "That signing turn does not exist",
+            body:
+              "The link carries a signer that this workflow does not have. Open the workflow and use the Sign now button in “Your part”.",
+          },
+          SIGNER_MISSING: {
+            title: "The link does not say which slot to sign",
+            body:
+              "One person can stand at two different steps of the same workflow, so the page needs to know which turn you mean. Open the workflow and use the Sign now button in “Your part”.",
+          },
+          NOT_YOUR_TURN: {
+            title: "An earlier step has not finished signing yet",
+            body:
+              "The workflow signs by level: you can sign once every required signer before you is done. Nothing is needed from you until then.",
+          },
+          ALREADY_SIGNED: {
+            title: "You already signed this part",
+            body: "Your signature is in the document. There is nothing left to do here.",
+          },
+          DECLINED: {
+            title: "You declined this workflow",
+            body: "A refusal cannot be taken back from this screen.",
+          },
+          REQUEST_CANCELLED: {
+            title: "This workflow was cancelled",
+            body: "Nobody can sign a cancelled workflow, whatever their turn was.",
+          },
+          REQUEST_COMPLETED: {
+            title: "This workflow is already complete",
+            body: "Everyone signed. The finished document is on the workflow page.",
+          },
+          LEASE_TOKEN_MISSING: {
+            title: "This signing session is not valid",
+            body: "This page did not get here through the Sign now button on the workflow page, or the session has expired. Go back and press Sign now again.",
+          },
+        },
+      },
+    },
+
+    /**
+     * Mẫu yêu cầu ký. Câu chữ ở đây nói về thứ DÙNG LẠI được — một mẫu, chứ
+     * không phải một yêu cầu cụ thể — nên tránh mọi từ ngụ ý "lần này".
+     */
+    template: {
+      signatureCount: (count: number) =>
+        count === 1 ? "1 signature" : `${count} signatures`,
+      stepCount: (count: number) => (count === 1 ? "1 step" : `${count} steps`),
+      variableCount: (count: number) => (count === 1 ? "1 field" : `${count} fields`),
+
+      source: {
+        label: "Where the document comes from",
+        uploadTab: "Upload a file",
+        templateTab: "Use a template",
+      },
+
+      picker: {
+        title: "Templates",
+        detailTitle: "Template details",
+        detailEmpty: "Pick a template to see its flow and its fields.",
+        searchPlaceholder: "Search templates",
+        refresh: "Reload",
+        create: "New template",
+        edit: "Edit",
+        duplicate: "Duplicate",
+        delete: "Delete",
+        confirmDelete: (name: string) => `Delete “${name}”? This cannot be undone.`,
+        loadFailed: "Could not load the templates",
+        version: (versionNo: number) => `v${versionNo}`,
+        publishedNote:
+          "Templates are authored on the service: upload, configure the fields and the signer roles, then publish a version. This screen consumes the published version — the number of signature boxes, the step order and the box positions come from it and cannot be changed here.",
+        previewUnavailable: "No preview has been built for this template.",
+        empty: "No active templates",
+        emptyHint:
+          "A template only appears here once one of its versions has been published. Upload the document and publish it on the service, then reload.",
+        noResults: "No template matches that.",
+        untitled: "Untitled template",
+        noDescription: "No description.",
+        builtIn: "Sample",
+        unnamedRole: "Unnamed slot",
+        flowSection: "Signing flow",
+        variablesSection: "Fields to fill",
+        noVariables: "This template has no fields — nothing to fill in.",
+        deadlineNote: (days: number) =>
+          `Deadline is set ${days} ${days === 1 ? "day" : "days"} after the request is created.`,
+        applied: (name: string) => `Template applied: ${name}`,
+        appliedBody: (signatures: number, variables: number) =>
+          `${signatures} signature ${signatures === 1 ? "slot" : "slots"} and ${variables} ${variables === 1 ? "field" : "fields"} are ready. Pick who stands in each role — the roles themselves are fixed by the template.`,
+        detached: "Template dropped — the flow was rebuilt empty, because template roles cannot be sent with an uploaded file.",
+      },
+
+      variables: {
+        label: "Fill in",
+        description:
+          "Fill the blanks the template left. Values go into the document itself, so everyone signs the finished text.",
+        title: "Fields in the document",
+        progress: (filled: number, total: number) => `${filled} of ${total} filled`,
+        stillRequired: (count: number) => `${count} still required`,
+        required: "Required",
+        optional: "optional",
+        reset: "Clear",
+        noVariables: "This template has no fields. Continue to arrange the signers.",
+        selectPlaceholder: "— Choose —",
+        unfilled: "not filled",
+        previewTitle: "Preview",
+        previewEmpty: "The template document could not be opened.",
+        previewUnreadable:
+          "The text of this file could not be read here, so there is nothing to preview. The values are still recorded with the request.",
+        serverRenderNote:
+          "This is the template's blank preview with the values drawn over the placeholders. The real document is built by the service when the request is created — that copy is what everyone signs.",
+      },
+
+      review: {
+        section: "From template",
+        edit: "Edit fields",
+        goToVariables: "Fill it in",
+      },
+
+      /**
+       * Hộp thoại soạn mẫu bốn bước (`template-builder-dialog.tsx`): tải tài
+       * liệu, xác nhận biến, dựng luồng ký, kiểm tra rồi publish.
+       */
+      builder: {
+        titleCreate: "New template",
+        titleEdit: "Edit template",
+        headingCreate: "New template",
+        headingEdit: "Edit template",
+        serverDraft: (versionNo: number) => `DRAFT V${versionNo} ON THE SERVER`,
+        introMetadataOnly:
+          "A published version is immutable. Only the name and the description can be changed here.",
+        intro:
+          "Upload the document, confirm the fields, configure the signing flow, then check the PDF before publishing.",
+        openFullscreen: "Full-screen preview",
+        fallbackName: "Template",
+        fallbackPreviewTitle: "Template preview",
+        fieldPreviewTitle: (name: string) => `Field preview · ${name}`,
+        noDocumentTitle: "No document yet",
+        noDocumentBody: "Go back to step 1 and upload the source document.",
+
+        stepper: {
+          navLabel: "Template steps",
+          document: { label: "Document", caption: "Upload & detect" },
+          variables: { label: "Fields", caption: "Confirm & preview" },
+          signatures: { label: "Signatures", caption: "Workflow & position" },
+          review: { label: "Review", caption: "Preview & save" },
+        },
+
+        actions: {
+          saveChanges: "Save changes",
+          back: "Back",
+          saveDraft: "Save draft",
+          submitDocument: "Submit document",
+          continue: "Continue",
+          publish: "Publish template",
+        },
+
+        hint: {
+          metadataLocked: "This template has left draft — the server allows no further edits.",
+          metadataEditable: "Change the name or the description, then press Save changes.",
+          documentPending:
+            "Enter a code and a name, then pick a file. The draft is only created once you press Submit document.",
+          documentReady: (fields: number, pages: number) =>
+            `The server detected ${fields} ${fields === 1 ? "field" : "fields"} across ${pages} ${pages === 1 ? "page" : "pages"}.`,
+          variables: (count: number) =>
+            `Configuring ${count} ${count === 1 ? "field" : "fields"}. The keys are read from the file by the server and cannot be edited.`,
+          signatures: (roles: number, steps: number) =>
+            `${roles} ${roles === 1 ? "signature" : "signatures"} across ${steps} ${steps === 1 ? "step" : "steps"}. Positions are saved when you move to the next step.`,
+          reviewDirty: "There are unsaved changes — publishing will save them first.",
+          reviewClean: "Check it once more, then publish to move the template to ACTIVE.",
+        },
+
+        error: {
+          fileType: (extensions: string) =>
+            `Only ${extensions} are accepted. The server cannot read any other format at this step.`,
+          fileTooLarge: (size: string) => `The file is over the size limit (${size}).`,
+          createDraft: "Could not create the template draft on the server.",
+          preview: (variant: string) => `Could not load the ${variant} PDF.`,
+          saveFields: "Could not save the field configuration.",
+          saveSigners: "Could not save the signer roles and the signature positions.",
+          saveMetadata: "Could not update the name and the description.",
+          publish: "Could not publish the template.",
+        },
+
+        document: {
+          identityEyebrow: "01 · TEMPLATE DETAILS",
+          identityTitle: "Identifying information",
+          identityDescription:
+            "Used in the template list and when a signing request is created from this template.",
+          codeLabel: "Template code",
+          codeHint:
+            "Starts with a letter or a digit; letters, digits, underscores and hyphens only.",
+          codePlaceholder: "EMPLOYMENT_CONTRACT",
+          statusLabel: "Status",
+          statusHint: "Decided by the server — only publishing moves it to ACTIVE.",
+          nameLabel: "Template name",
+          namePlaceholder: "Employment contract",
+          namePickFileFirst: "Pick a document first to unlock the name and the description.",
+          descriptionLabel: "Description",
+          descriptionHint: "Optional. A short note on what it is for.",
+          lockedNote:
+            "The draft now exists on the server, so the code, the name and the description are locked at this step. Renaming is a separate action once the template is saved.",
+          sourceEyebrow: "02 · SOURCE DOCUMENT",
+          sourceTitle: "Upload the document and detect its fields",
+          sourceDescription:
+            "The backend reads the DOCX/XLSX, finds every {{variable}} placeholder and builds the PDF preview.",
+          dropzone: "Choose a document, or drop it here",
+          dropzoneHint: (size: string) =>
+            `DOCX and XLSX only, up to ${size}. The server is the source of truth for the field list and for the PDF preview.`,
+          replaceFile: "Replace document",
+          metricFields: "Fields detected",
+          metricPages: "PDF pages",
+          metricVersion: "Version ID",
+          analysisBusyStrong: "Submitting the document:",
+          analysisBusy:
+            "the server is detecting fields and converting to PDF. This can take tens of seconds for a large file.",
+          analysisDoneStrong: "Draft created on the server.",
+          analysisDone: (count: number) =>
+            `Received ${count} ${count === 1 ? "field" : "fields"}.`,
+          analysisPending:
+            "The file is still only in the browser. Press “Submit document” for the server to read its fields and build the PDF — the draft exists only from that moment.",
+        },
+
+        variables: {
+          title: "Fields in the document",
+          description:
+            "The keys are detected by the backend and are not editable here. You configure how they are filled in.",
+          count: (n: number) => `${n} ${n === 1 ? "field" : "fields"}`,
+          none: "No {{variable}} placeholder was found in the document.",
+          occurrences: (n: number) => `${n} ${n === 1 ? "place" : "places"}`,
+          keyLocked: "Key detected by the backend",
+          labelLabel: "Display name",
+          labelPlaceholder: "Contract number",
+          typeLabel: "Data type",
+          optionsLabel: "Choices",
+          optionsHint: "Separate them with commas.",
+          defaultLabel: "Default value",
+          hintLabel: "Input hint",
+          requiredLabel: "Required when a signing request is created",
+          previewTitle: "Field preview",
+          previewSubtitle: "The fields are highlighted in the PDF rendered by the backend.",
+        },
+
+        signatures: {
+          flowTitle: "Signing flow",
+          flowDescription:
+            "Pick a signature to configure it and to place it on the document on the right.",
+          roleCount: (n: number) => `${n} ${n === 1 ? "signature" : "signatures"}`,
+          flowNotice:
+            "Steps run one after another from top to bottom. Several signatures in the SAME step sign in parallel: they all open at once, and the next step waits for every one of them.",
+          stepNamePlaceholder: (n: number) => `Signing step ${n}`,
+          parallelStep: (n: number) => `${n} signatures in parallel`,
+          moveStepUp: "Move step up",
+          moveStepDown: "Move step down",
+          deleteStep: "Delete step",
+          addRole: "Add a signature to this step",
+          addParallelRole: "Add a parallel signature",
+          addStep: "Add signing step",
+          positionTitleEmpty: "Pick a signature to place it",
+          positionHint:
+            "Drag or resize the signature box on the PDF. The other boxes are shown for reference.",
+          reloadPdf: "Reload PDF",
+          loadingPlain: "Building the PDF used to place the signatures…",
+          previewFailedTitle: "Could not build the preview",
+          noPreviewTitle: "No PDF preview yet",
+          noPreviewBody: "Press “Reload PDF” to fetch the PLAIN copy from the server again.",
+          noRoleTitle: "No signature selected",
+          noRoleBody: "Pick a signature in the panel on the left to place it.",
+          invisibleTitle: "Signature not shown",
+          invisibleBody:
+            "This signature is configured as an invisible signature, so it needs no position on the page.",
+          unnamedRole: "Unnamed signature",
+          noCode: "no code",
+          pageChip: (page: number) => `Page ${page}`,
+          noBox: "No signature box",
+          roleNamePlaceholder: "e.g. Employee",
+          deleteRole: "Delete signature",
+          roleCodeLabel: "Role code",
+          roleCodeHint: "The business identifier sent to the server. Renaming does not change it.",
+          roleCodePlaceholder: "EMPLOYEE",
+          suggestedSigner: "Suggested signer",
+          noSuggestion: "No suggestion",
+          baselineLabel: "Baseline",
+          locationLabel: "Signing location",
+          reasonLabel: "Signing reason",
+          visibleLabel: "Show the signature on the document",
+          visibleHint:
+            "Templates require it: the server demands at least one signature box per role, so an invisible signature blocks publishing.",
+        },
+
+        review: {
+          emptyTitle: "No template yet",
+          emptyBody: "Go back through the earlier steps to configure it.",
+          summaryTemplate: "Template",
+          summaryNoCode: "No code",
+          summaryFields: "Fields",
+          summaryFieldsSub: "detected by the server",
+          summarySteps: "Signing steps",
+          summaryStepsSub: (roles: number) =>
+            `${roles} ${roles === 1 ? "signature" : "signatures"}`,
+          summaryStatus: "Status",
+          summaryStatusSub: "after publishing",
+          publishEyebrow: "FINAL CHECK",
+          publishTitle: "Ready to publish this template?",
+          publishDescription:
+            "Publishing moves the template to ACTIVE and freezes this version — a published version can no longer be edited.",
+          blockersTitle: "Must be fixed",
+          noBlockers: "Nothing is blocking the publish.",
+          warningsTitle: "Model warnings",
+          noWarnings: "No further warnings.",
+          workflowEyebrow: "WORKFLOW",
+          workflowTitle: "Signing flow summary",
+          workflowDescription: "Top to bottom is the execution order of the workflow.",
+          stepFallback: (n: number) => `Step ${n}`,
+          orderChip: (n: number) => `Signing order ${n}`,
+          unnamedRole: "Unnamed",
+          finalEyebrow: "FINAL PROOF",
+          finalTitle: "PDF with the fields highlighted and every signature box",
+          finalDescription:
+            "The PDF is built by the server; the signature boxes are drawn over it here at exactly the coordinates that will be sent.",
+          loadingHighlight: "Loading the PDF with the fields highlighted…",
+          previewFailedTitle: "Could not load the preview",
+          noPreviewTitle: "No PDF preview yet",
+          noPreviewBody: "Go back a step to load the PDF.",
+        },
+
+        previewPanel: {
+          refresh: "Reload",
+          fullscreen: "Full screen",
+          loading: "The backend is rendering the PDF preview…",
+          errorTitle: "Could not build the preview",
+          emptyTitle: "No PDF preview yet",
+          emptyBody: "The preview appears once the document rendering API is connected.",
+        },
+
+        fullscreen: {
+          label: (title: string) => `Preview ${title}`,
+          subtitle: "Final preview · fields highlighted · signature boxes as configured",
+          close: "Close preview",
+        },
+
+        viewer: {
+          previousPage: "Previous page",
+          currentPage: "Current page",
+          nextPage: "Next page",
+          zoomOut: "Zoom out",
+          zoomIn: "Zoom in",
+          fitWidth: "Fit width",
+          pages: (n: number) => `PDF · ${n} ${n === 1 ? "page" : "pages"}`,
+          preparing: "Preparing the PDF…",
+          frameTitle: "PDF preview",
+        },
+
+        metadataOnly: {
+          eyebrow: "EDIT TEMPLATE",
+          title: "Identifying information",
+          description:
+            "The template code and the document content cannot change once the template exists.",
+          codeLabel: "Template code",
+          statusLabel: "Status",
+          nameLabel: "Template name",
+          descriptionLabel: "Description",
+          lockedNote:
+            "This template has left draft, so the server locks both the name and the description. Changing the content or the signing flow means creating a new template — the service has no API for creating a new version of a published template.",
+          editableNote:
+            "Only the name and the description are editable here. The fields, the signer roles and the signature positions belong to the published version and are immutable.",
+        },
+
+        status: {
+          DRAFT: "Draft",
+          ACTIVE: "Active",
+          INACTIVE: "Suspended",
+          ARCHIVED: "Archived",
+        },
+
+        variableType: {
+          text: "Text (TEXT)",
+          multiline: "Long text (LONG_TEXT)",
+          number: "Number (NUMBER)",
+          date: "Date (DATE)",
+          select: "Choice list (SELECT)",
+        },
+
+        /**
+         * Lý do máy chủ sẽ từ chối, kể ra TRƯỚC khi gọi — xem
+         * `features/sign-request/template-authoring.ts`.
+         */
+        blockers: {
+          unnamedRole: "an unnamed signature",
+          codeMissing: "The template code is empty.",
+          codeInvalid:
+            "The template code must start with a letter or a digit, and may contain only letters, digits, underscores and hyphens.",
+          codeTooLong: (max: number) => `The template code is over ${max} characters.`,
+          noDocument: "No source document has been chosen.",
+          nameMissing: "The template name is empty.",
+          nameTooLong: (max: number) => `The template name is over ${max} characters.`,
+          descriptionTooLong: (max: number) => `The description is over ${max} characters.`,
+          notAnalyzed: "The document has not been received and analysed by the server.",
+          selectNoOptions: (key: string) => `The choice field {{${key}}} has no choices yet.`,
+          defaultNotInOptions: (key: string) =>
+            `The default value of {{${key}}} is not one of its choices.`,
+          noRoles: "The signing flow has no signature in it.",
+          emptyStep: (step: number) => `Step ${step} has no signature.`,
+          roleUnnamed: "A signature still has no role name.",
+          roleNoCode: (label: string) => `Signature “${label}” has no role code.`,
+          duplicateRoleCode: (code: string) => `Role code “${code}” is used twice.`,
+          roleInvisible: (label: string) =>
+            `Signature “${label}” is set to invisible. A template requires every role to have a signature box on the page.`,
+          slotPageOutOfRange: (label: string, page: number, pageCount: number) =>
+            `Signature “${label}” sits on page ${page}, outside the ${pageCount}-page range.`,
+          slotNoSize: (label: string) => `Signature box “${label}” has no size.`,
+          slotOutOfBounds: (label: string) => `Signature box “${label}” runs off the page edge.`,
+          slotOverlap: (first: string, second: string) =>
+            `Signature boxes “${first}” and “${second}” overlap.`,
+        },
+      },
+
+      /**
+       * Hộp thoại thêm/sửa mẫu. Chỉ nói về phần KHAI BÁO của một mẫu — các ô
+       * phải điền và vai ký thuộc về bước cấu hình phiên bản, không phải chỗ này.
+       */
+      form: {
+        titleCreate: "New template",
+        titleEdit: "Edit template",
+        description:
+          "Name the template, say when to reach for it, and attach the document it is built from. Fields and signer roles are configured on the version afterwards.",
+
+        codeLabel: "Code",
+        codePlaceholder: "SERVICE_AGREEMENT",
+        codeHint: "The identifier the service refers to. Letters, digits and underscores.",
+        nameLabel: "Name",
+        namePlaceholder: "Service agreement",
+        descriptionLabel: "Description",
+        descriptionHint: "One line telling a colleague when to reach for this template.",
+        statusLabel: "Status",
+        status: {
+          DRAFT: "Draft",
+          ACTIVE: "Active",
+          INACTIVE: "Inactive",
+          ARCHIVED: "Archived",
+        },
+
+        fileSection: "Source document",
+        chooseFile: "Choose document",
+        replaceFile: "Replace",
+        noFile: "No document chosen yet.",
+        fileHint:
+          "PDF, DOCX or XLSX. Anywhere you wrote {{field_name}} in it becomes a field to fill.",
+        keepFile: "Leave this empty to keep the document the current version already uses.",
+
+        incomplete: "A template needs a code and a name.",
+        notWired:
+          "Nothing is sent yet: this dialog collects the values, and the create/update call is still to be wired to the service.",
+        save: "Save template",
+      },
+
+      manager: {
+        title: "Templates",
+        description: "Everything reusable about a signing request lives here.",
+        searchPlaceholder: "Search templates",
+        create: "New template",
+        use: "Use",
+        edit: "Edit",
+        duplicate: "Duplicate",
+        delete: "Delete",
+        copySuffix: "(copy)",
+        updatedAt: (value: string) => `updated ${value}`,
+        confirmDelete: (name: string) => `Delete “${name}”? This cannot be undone.`,
+        saved: "Template saved",
+        deleted: "Template deleted",
+        deleteFailed: "Template not deleted",
+        saveFailed: "Template not saved",
+        saveFailedBody:
+          "Browser storage refused the write — most likely it is full. Remove a template you no longer use and try again.",
+        storageNote:
+          "Templates are stored in this browser only. They are not shared with colleagues, and clearing site data removes them.",
+      },
+
+      editor: {
+        titleCreate: "New template",
+        titleEdit: "Edit template",
+        description:
+          "The document and its blanks on the left; who signs it, in what order, on the right.",
+
+        pickFileTitle: "Start from a document",
+        pickFileBody:
+          "Upload the file this template produces. Anywhere you wrote {{field_name}} in it becomes a blank to fill; signature boxes are placed on top of it.",
+        chooseFile: "Choose document",
+        fileTooLarge: (limit: string) =>
+          `The file is over ${limit}. Templates live in browser storage, which is too small for documents that size.`,
+
+        infoSection: "Template",
+        nameLabel: "Name",
+        namePlaceholder: "Service agreement",
+        descriptionLabel: "Description",
+        descriptionHint: "One line telling a colleague when to reach for this template.",
+
+        fileSection: "Document",
+        replaceFile: "Replace",
+        nonPdfNote:
+          "Only PDF carries a visible signature box on the page. Positions set below are recorded but not drawn for this format.",
+        scanning: "Reading the document…",
+        scanned: (count: number) =>
+          count === 0
+            ? "No {{placeholder}} found in the document."
+            : `${count} placeholder${count === 1 ? "" : "s"} found in the document.`,
+        scanFailed:
+          "The text of this file could not be read here. Declare the fields by hand — they still work.",
+        undeclaredFound: (count: number) =>
+          count === 1
+            ? "1 placeholder is in the document but not declared. Nobody will be asked to fill it in."
+            : `${count} placeholders are in the document but not declared. Nobody will be asked to fill them in.`,
+        addAllVariables: "Declare them",
+
+        variablesSection: "Fields",
+        addVariable: "Add field",
+        noVariables:
+          "No fields yet. Anything written as {{field_name}} in the document belongs here.",
+        removeVariable: "Remove field",
+        variableKeyLabel: "Placeholder name",
+        variableLabelLabel: "Label",
+        variableLabelPlaceholder: "Label shown on the form",
+        variableTypeLabel: "Type",
+        variableType: {
+          text: "Text",
+          multiline: "Long text",
+          number: "Number",
+          date: "Date",
+          select: "Choice",
+        },
+        optionsLabel: "Choices",
+        optionsPlaceholder: "Choices, separated by commas",
+        defaultValueLabel: "Default",
+        defaultValuePlaceholder: "Default value",
+        variableHintLabel: "Hint",
+        variableHintPlaceholder: "Hint under the field",
+        requiredLabel: "Required",
+        notInDocument: "not in document",
+        notInDocumentHint:
+          "This name was not found in the document text. A misspelt name is never filled in.",
+
+        defaultsSection: "Request defaults",
+        requestNameLabel: "Request name",
+        requestNamePlaceholder: "Agreement {{contract_no}}",
+        messageLabel: "Message to signers",
+        patternHint: "You can use {{field_name}} here — it is replaced with what was filled in.",
+        deadlineDaysLabel: "Deadline, in days",
+        deadlineDaysHint:
+          "Counted from the day the request is created. Leave empty for no deadline.",
+
+        flowSection: "Signature slots",
+        flowHint:
+          "A slot is a role, not a person: “Head of finance”, not a name. The person is chosen each time the template is used.",
+        addRole: "Add signature slot",
+        removeRole: "Remove slot",
+        roleLabel: "Slot name",
+        rolePlaceholder: "Head of finance",
+        unnamedRole: "Unnamed slot",
+        suggestedLabel: "Usual signer",
+        suggestedHint: "Filled in for whoever uses the template — they can still change it.",
+        noSuggestion: "No suggestion",
+        showConfig: "Configure",
+        hideConfig: "Hide",
+        emptyStep: "This step has no signature slot.",
+
+        save: "Save template",
+        ready: "Ready to save",
+        moreIssues: (count: number) => `and ${count} more`,
+        issue: {
+          NO_NAME: "The template has no name.",
+          NO_FILE: "The template has no document.",
+          NO_ROLE: "The template has no signature slot.",
+          ROLE_WITHOUT_NAME: "A signature slot has no name.",
+          EMPTY_STEP: (index: number) => `Step ${index} has no signature slot.`,
+          DUPLICATE_VARIABLE_KEY: (key: string) => `The field {{${key}}} is declared twice.`,
+          SELECT_WITHOUT_OPTIONS: (key: string) =>
+            `{{${key}}} is a choice field with no choices.`,
+          UNDECLARED_VARIABLE: (key: string) =>
+            `{{${key}}} is in the document but not declared — nobody will be asked for it.`,
+        },
+      },
     },
   },
 
@@ -1090,6 +2048,8 @@ export const en = {
     signatureList: {
       title: "Signatures found",
       empty: "No signatures were found in this file.",
+      checksPassed: (passed: number, total: number) =>
+        `${passed} of ${total} key checks passed`,
     },
     empty: {
       title: "Submit a signed artifact",
@@ -1141,6 +2101,42 @@ export const en = {
       signatureAlgorithm: "Signature algorithm",
       digestAlgorithm: "Digest algorithm",
       validationSummary: "Validation summary",
+    },
+    /*
+     * The five cards of schema 6.1.0. Titles live here so the screen stays
+     * bilingual; `detail` still comes from the backend, because it is the only
+     * source of the case-specific reason (why SIGNED_WITHIN_VALIDITY came back
+     * INDETERMINATE, for instance). An id with no entry here falls back to the
+     * backend title, so a card added in a later minor still renders.
+     */
+    primaryChecks: {
+      documentTitle: "Key checks across the document",
+      documentDescription:
+        "The worst result of each check across every signature. Select a signature to see its own result.",
+      linkedIssues: (n: number) => (n === 1 ? "See the cause →" : `See ${n} causes →`),
+      byId: {
+        INTEGRITY: {
+          title: "Content integrity",
+          description: "The signed content is unchanged since it was signed.",
+        },
+        TRUSTED_SIGNATURE: {
+          title: "Trusted signature",
+          description:
+            "The signature value is cryptographically correct and the signer's certificate builds to a trusted source.",
+        },
+        SIGNED_WITHIN_VALIDITY: {
+          title: "Signed within the certificate's validity",
+          description: "The signature was created while the signer's certificate was still valid.",
+        },
+        TIMESTAMP_PRESENT: {
+          title: "Timestamp",
+          description: "Whether the document carries a valid timestamp token.",
+        },
+        CERTIFICATE_NOT_REVOKED: {
+          title: "Certificate not revoked",
+          description: "The signer's certificate had not been revoked at the reference time.",
+        },
+      } as Record<string, { title: string; description: string }>,
     },
     validation: {
       groups: {
@@ -1367,8 +2363,13 @@ export const en = {
       verificationResult: "Verification result",
       signatures: "Signatures",
       signer: "Signer",
+      signatureDetailTitle: "Signature details",
       trust: "Trust",
       signingTime: "Signing time",
+      /* Deliberately not "Signing time": nothing corroborates this value but the signer's own word. */
+      claimedSigningTime: "Signing time claimed by signer",
+      timestampNotTrustedTime:
+        "The timestamp is valid, but the verifier has not loaded the TSA's trust anchor, so its time is not used as the reference time.",
       userChecks: "Key checks",
       integrity: "Content integrity",
       integrityDescription: "Checks the scope of content the signature protects.",
@@ -1991,6 +2992,460 @@ export const en = {
       retryFailedTitle: "Retry failed",
     },
     correlationId: (id: string) => `Correlation ID: ${id}`,
+  },
+
+  /**
+   * Public signing page (`/external-sign`) — the only screen in this app whose
+   * reader is not a colleague. Copy rules that follow from that:
+   *
+   * - No internal vocabulary. No "capability", no "baseline T", no "proxy", and
+   *   above all no billing talk: a signer must never be told that their next
+   *   click costs the sender a signing credit.
+   * - Every dead end says who to contact. This person cannot fix a link, cannot
+   *   read a log, and cannot retry their way out of an expired token.
+   * - Every step says what it needs before it asks for it, so nobody starts a
+   *   method they have no credential for.
+   */
+  /**
+   * SIGNING LEASE — shared by the internal signing screen and the public one,
+   * because both describe the same backend mechanism.
+   *
+   * The wording deliberately never says "lease": signers do not need the name of
+   * the mechanism, they need to know whether to wait or to click. Only the
+   * internal screen uses `lockedByBody` (which names the current signer) — see
+   * `SigningLeasePanel`.
+   */
+  signingLease: {
+    checking: "Checking the signing turn…",
+    lockedTitle: "Someone else is signing",
+    lockedBody:
+      "Another signer is signing this document right now. Please wait for them to finish — this page updates itself as soon as the turn is free.",
+    lockedByBody: (holder: string) =>
+      `${holder} is signing this document right now. Please wait — this page updates itself once they finish.`,
+    lockedRetryHint: (seconds: number) =>
+      `The current turn lasts at most ${Math.max(1, Math.ceil(seconds / 60))} more minute(s).`,
+    heldTitle: "You already have a signing attempt open",
+    heldBody:
+      "The signing service still holds an unfinished attempt of yours — usually after a page reload or a second tab. Cancel it to start over.",
+    cancel: "Cancel it and start over",
+    cancelling: "Cancelling…",
+    errorTitle: "Could not check the signing turn",
+    errorBody:
+      "We do not know whether this turn is free, so signing stays disabled. Try again in a moment.",
+    retry: "Try again",
+
+    /** The short line under the Sign button explaining why it is disabled. */
+    action: {
+      checking: "Checking the signing turn…",
+      locked: "Another signer is signing this document.",
+      held: "Cancel your open signing attempt first.",
+      unavailable: "The signing turn could not be checked.",
+    },
+
+    /** `SIGNING_LEASE_LOCKED` — lost the race at the signing call itself. */
+    lockedNowTitle: "Someone else started signing first",
+    lockedNowBody:
+      "The turn went to another signer in the same second you clicked. Nothing of yours was submitted — this page will unlock itself when your turn comes.",
+
+    /** `SIGNING_LEASE_LOST` — the attempt in progress is no longer valid. */
+    lostTitle: "That signing attempt has ended",
+    lostBody:
+      "The turn expired or was handed to someone else. Anything in progress was discarded — please start over once the turn is free.",
+  },
+
+  externalSign: {
+    meta: {
+      title: "Sign document",
+      description: "Review the document and sign it — no account needed",
+    },
+
+    chrome: {
+      brand: "FIS CA",
+      subtitle: "Electronic signing",
+      publicBadge: "Personal signing link",
+      secureNote: "No sign-in needed. This link places exactly one signature — yours.",
+      sessionExpiresIn: (remaining: string) => `Session ends in ${remaining}`,
+      sessionEndingSoon: "Session is about to end",
+      sessionExpired: "Session has ended",
+      sessionExpiredBody:
+        "Nothing was signed. Open the link from your email again to start a new session.",
+    },
+
+    demo: {
+      badge: "Demo",
+      title: "Interface demo — nothing is being signed",
+      body:
+        "The public signing endpoints are a target contract and are not live yet, so this page is running on mock data generated in your browser. No service is being called and no signature is created.",
+      scenarios:
+        "Add a scenario to the link to see the other states: #demo=1&t=expired, t=invalid, t=notcurrent, t=signed, t=changed, t=conflict (someone at the same step signs first), t=locked (someone else holds the signing turn).",
+    },
+
+    loading: {
+      title: "Opening your signing link",
+      body: "Checking the link and loading the document. This takes a moment.",
+    },
+
+    unavailable: {
+      whatNow: "What to do next",
+      contactSender: "Contact the person who sent you this document and ask for a new link.",
+      retry: "Try again",
+      codeLabel: "Error code",
+      correlationLabel: (id: string) => `Reference: ${id}`,
+    },
+
+    /**
+     * Title + what-to-do, per error code from §11 of the integration document.
+     * Codes not listed here fall back to `unknown` with the server's own
+     * sentence, which is more useful than a generic apology.
+     */
+    errors: {
+      unknownTitle: "Something went wrong",
+      unknownBody: "Please try again. If it keeps happening, contact the sender.",
+      EXTERNAL_SIGNING_NO_SESSION: {
+        title: "This page needs a signing link",
+        body: "Open the link from the email or message you received. It carries the code that identifies you.",
+      },
+      EXTERNAL_SIGNING_TOKEN_INVALID: {
+        title: "This link is not valid",
+        body: "It may have been mistyped, cut short by an email client, or replaced by a newer link.",
+      },
+      EXTERNAL_SIGNING_FORBIDDEN: {
+        title: "This session cannot sign",
+        body: "The session is no longer trusted by the service. Open your link again to start a new one.",
+      },
+      EXTERNAL_SIGNING_LINK_EXPIRED: {
+        title: "This link has expired",
+        body: "Signing links are valid for a limited time. Nothing was signed.",
+      },
+      EXTERNAL_SIGNING_CSRF_MISSING: {
+        title: "This tab cannot sign",
+        body: "The document is still readable, but the signing key for this session is gone — that happens when the page is reopened in a new tab. Open your link again to sign.",
+      },
+      EXTERNAL_SIGNING_API_NOT_CONFIGURED: {
+        title: "Signing is not available right now",
+        body: "The signing service is not reachable from this site. Please tell the sender.",
+      },
+      EXTERNAL_SIGNING_API_UNREACHABLE: {
+        title: "Cannot reach the signing service",
+        body: "This is usually temporary. Try again in a minute.",
+      },
+      SIGNER_NOT_CURRENT: {
+        title: "It is not your turn yet",
+        body: "Someone has to sign before you. You will be able to sign with this same link once they do.",
+      },
+      SIGNING_DOCUMENT_CHANGED: {
+        title: "The document has changed",
+        body: "It was edited after your link was created, so this link no longer matches it. Ask the sender for a new link.",
+      },
+      SIGNER_ALREADY_PROCESSED: {
+        title: "You have already signed this",
+        body: "No further action is needed. The sender has your signature.",
+      },
+      SIGNING_LEASE_LOCKED: {
+        title: "Another signer is signing this document",
+        body: "The turn just went to someone else. Wait for them to finish and sign again — you do not need a new link.",
+      },
+      SIGNING_LEASE_LOST: {
+        title: "Your signing attempt has ended",
+        body: "The turn expired or was handed to someone else. Start over once the turn is free.",
+      },
+      SIGNING_ALREADY_STARTED: {
+        title: "A signing attempt is already open",
+        body: "Continue the attempt below instead of starting a new one.",
+      },
+      SIGNING_NOT_STARTED: {
+        title: "That attempt is no longer open",
+        body: "Start signing again from the beginning.",
+      },
+      SIGN_REQUEST_INVALID: {
+        title: "Check what you entered",
+        body: "Something in the signing details is missing or does not match. Review the fields and try again.",
+      },
+      SIGNED_DOCUMENT_MISSING: {
+        title: "The signature could not be saved",
+        body: "Do not try again straight away — contact the sender so they can check with support.",
+      },
+    },
+
+    summary: {
+      title: "What you are signing",
+      documentLabel: "Document",
+      signerLabel: "Signing as",
+      orderLabel: "Your turn",
+      order: (position: number) => `Signer ${position}`,
+      checksumLabel: "Document fingerprint",
+      checksumHint:
+        "Identifies this exact file. If the sender reads you a different fingerprint, do not sign.",
+      statusPending: "Awaiting your signature",
+      statusSigned: "Signed",
+      statusDeclined: "Declined",
+    },
+
+    steps: {
+      navLabel: "Signing steps",
+      stepOf: (current: number, total: number) => `Step ${current} of ${total}`,
+      lockedHint: "Finish the earlier steps to unlock this one.",
+      review: {
+        label: "Read",
+        title: "Read the document",
+        description: "Check the whole document, then confirm you agree to sign it.",
+      },
+      method: {
+        label: "Method",
+        title: "How do you want to sign?",
+        description: "Pick what you already have — each option lists what it needs.",
+      },
+      credential: {
+        label: "Details",
+        title: "Your signing details",
+        description: "Fill in what the method you picked needs from you.",
+      },
+      sign: {
+        label: "Sign",
+        title: "Place your signature",
+        description: "One last look, then sign.",
+      },
+    },
+
+    viewer: {
+      title: "Document",
+      loading: "Loading document…",
+      errorTitle: "The document could not be loaded",
+      retry: "Load again",
+      page: (current: number, total: number) => `Page ${current} of ${total}`,
+      previous: "Previous page",
+      next: "Next page",
+      zoomIn: "Zoom in",
+      zoomOut: "Zoom out",
+      signatureBadge: "Your signature",
+      signatureOnPage: (page: number) => `Your signature goes on page ${page}`,
+      goToSignature: "Go to my signature",
+      pageHasSignature: "Signature on this page",
+      extraSlots: (count: number) =>
+        `This document has ${count} signature boxes for you. All of them are marked.`,
+      nonPdfTitle: "Preview not available for this file type",
+      nonPdfBody:
+        "You can still sign it. Ask the sender for a copy if you need to read it in full first.",
+    },
+
+    consent: {
+      title: "Before you sign",
+      checkbox: "I have read this document and agree to sign it",
+      hint: "Your electronic signature is legally equivalent to a handwritten one.",
+      scrollNote: "Check every page — the signature covers the whole document.",
+    },
+
+    method: {
+      title: "How do you want to sign?",
+      note: "The sender decides which methods are available for this document.",
+      requirementLabel: "You need",
+      pkcs12: {
+        label: "Certificate file (.p12 / .pfx)",
+        description: "You hold the certificate file and its password.",
+        requirement: "The .p12 or .pfx file and its password",
+      },
+      mpki: {
+        label: "FPT MPKI app",
+        description: "You approve the signature on your phone.",
+        requirement: "The FPT MPKI app, signed in on your phone",
+      },
+      signCloud: {
+        label: "FPT eSign Cloud",
+        description: "You confirm your identity and enter a one-time code.",
+        requirement: "Your ID card details and the phone number registered with FPT",
+      },
+      usbToken: {
+        label: "FPT USB Token",
+        description: "You sign with the certificate stored on your USB token.",
+        requirement:
+          "The token plugged into this computer, its PIN, and the FPT-CA Signing Agent running",
+      },
+      /** Shown on a method the document's file type rules out — USB Token is PDF-only. */
+      unsupportedForFormat: "Not available for this file type",
+    },
+
+    pkcs12: {
+      title: "Certificate file (.p12 / .pfx)",
+      fileLabel: "Certificate file",
+      chooseFile: "Choose file",
+      replaceFile: "Change file",
+      noFile: "No file chosen",
+      passwordLabel: "File password",
+      passwordPlaceholder: "Password protecting the file",
+      aliasLabel: "Key name (optional)",
+      aliasPlaceholder: "Leave empty for the first key",
+      aliasHint: "Only needed if the file holds more than one certificate.",
+      privacyNote:
+        "The file and password are sent once, to create this signature, and are not stored by this page.",
+    },
+
+    mpki: {
+      usernameLabel: "MPKI username",
+      usernamePlaceholder: "The account you use in the FPT MPKI app",
+      loadCredentials: "Find my certificates",
+      changeAccount:"Change account",
+      loading: "Looking…",
+      credentialSelectLabel: "Certificate",
+      chooseCredential: "— Choose a certificate —",
+      multipleWarning:
+        "More than one certificate found. Pick the one you mean — the signature carries that identity.",
+      loadFailed: "Your certificates could not be listed",
+      empty: "No certificate is registered for that username. Check the spelling.",
+      manualHint:
+        "You can also type the certificate ID by hand if you know it — leave it empty when you only have one.",
+      credentialLabel: "Certificate ID (optional)",
+      credentialPlaceholder: "Leave empty if you only have one",
+      credentialHint: "Fill this in only if FPT issued you more than one certificate.",
+      note: "After you press Sign, keep this page open and approve the request in the app.",
+    },
+
+    signCloud: {
+      haveCertificate: "I already have an eSign Cloud certificate",
+      needCertificate: "I need a new certificate",
+      agreementLabel: "Certificate ID (agreementUuid)",
+      agreementPlaceholder: "The ID FPT gave you",
+      agreementHint: "Sent to you when your certificate was issued.",
+      enrollmentTitle: "Certificate registration",
+      enrollmentHint:
+        "FPT issues a certificate in your name from these details. They go to the certificate authority and are not kept by this page.",
+      personalNameLabel: "Full name",
+      citizenIdLabel: "ID card number",
+      mobileLabel: "Mobile number",
+      emailLabel: "Email",
+      locationLabel: "City (optional)",
+      provinceLabel: "Province (optional)",
+      countryLabel: "Country",
+      imagesTitle: "ID card photos",
+      imagesHint: "Both sides must be readable. A portrait photo is optional.",
+      /*
+       * One word each. These three sit side by side in a 23.5rem column, and any
+       * label long enough to wrap makes its box taller than the other two — the
+       * heading above already says these are ID card photos.
+       */
+      frontLabel: "Front",
+      backLabel: "Back",
+      faceLabel: "Portrait",
+      chooseImage: "Choose photo",
+      replaceImage: "Change photo",
+      removeImage: "Remove",
+      imageTooLarge: "This photo is too large even after resizing. Try a smaller one.",
+      imageNotImage: "Choose an image file.",
+      imageUnreadable: "This image could not be read. HEIC photos from iPhone often fail — try JPG.",
+      required: "Required",
+      requiredLegend: "Required",
+
+      /* Registration — the only way to get a certificate ID. */
+      enroll: "Request my certificate",
+      enrolling: "Sending…",
+      enrollFailed: "The certificate could not be requested",
+      requiredMissing: "Fill in every field marked * and add both sides of your ID card.",
+      enrollHint:
+        "FPT checks these details and issues a certificate in your name. You confirm your identity on their page in the next step.",
+      agreementIssued: "Certificate requested",
+      agreementReadyTitle: "Your certificate is ready",
+      agreementRestart: "Start over with different details",
+      confirmTitle: "Confirm your identity",
+      confirmBody:
+        "Open the certificate authority's page and confirm your details there. Come back to this tab when you are done — it checks for you.",
+      openSic: "Open the identity check",
+      sicWaiting: "Waiting for that page…",
+      sicBlocked: "Your browser blocked the pop-up. Use the link below instead.",
+      sicOpenManually: "Open the identity check in a new tab",
+      checkStatus: "Check my certificate",
+      checking: "Checking…",
+      checkAgain: "Check again",
+      statusFailed: "The certificate status could not be read",
+      notReadyYet:
+        "Not confirmed yet. Finish the identity check on the certificate authority's page, then check again.",
+    },
+
+    /**
+     * USB Token — guest-facing copy for the details step. The signing dialog
+     * itself is the one shared with `/sign` and keeps `sign.usbToken`.
+     */
+    usbToken: {
+      title: "FPT USB Token",
+      checkAgent: "Test the connection",
+      agentChecking: "Testing…",
+      agentReady: (count: number) =>
+        `The Signing Agent answered — ${count} certificate${count === 1 ? "" : "s"} found on your token.`,
+      noCertificates:
+        "No usable certificate was found. Check that the token is plugged in and that its driver recognises it.",
+      errorUnreachable:
+        "Cannot reach the FPT-CA Signing Agent at localhost:14211. Install it and make sure it is running, then test again.",
+      errorGeneric: "The USB token could not be read.",
+      note: "Your browser talks to the Signing Agent on this computer directly. Nothing about the token is sent anywhere.",
+      signerNameNote:
+        "The name on the signature is the one in the certificate on your token — this page never asks for it.",
+      pinNote:
+        "Your PIN is only ever typed into the FPT-CA window. This page never asks for it and never stores it.",
+    },
+
+    action: {
+      signButton: "Sign document",
+      signing: "Signing…",
+      needConsent: "Confirm you have read the document first.",
+      needMethod: "Choose how you want to sign.",
+      needFields: "Fill in the fields above.",
+      cannotSign: "This tab cannot sign — open your link again.",
+      expired: "The session has ended. Open your link again.",
+      reloadingDocument: "Fetching the latest version of the document…",
+      declineNote: "If you do not want to sign, simply close this page and tell the sender.",
+    },
+
+    /** Ai đó ký cùng lúc với bạn: tài liệu đổi giữa chừng, ký lại là xong. */
+    stale: {
+      title: "The document was just updated",
+      body: "Someone signing at the same step finished just before you, so the document changed. The latest version is being loaded — sign again and your signature goes onto that one.",
+    },
+
+    resume: {
+      title: "You have a signature in progress",
+      description:
+        "You started signing with eSign Cloud and haven't finished. Continue so you don't have to start over.",
+      dismiss: "Dismiss",
+      resume: "Continue",
+    },
+
+    pending: {
+      close: "Close",
+      working: "Working…",
+      appTitle: "Waiting for your approval",
+      appBody:
+        "Open the FPT MPKI app on your phone and approve the request. Keep this page open.",
+      identityTitle: "Confirm your identity",
+      identityBody:
+        "Open the certificate authority's page, confirm your details, then come back here and continue.",
+      identityDoneTitle: "Ready for the next step",
+      identityDoneBody: "Continue to receive your one-time code.",
+      openIdentity: "Open identity check",
+      continueButton: "I have confirmed — continue",
+      continueNote: "This opens the signing transaction at the certificate authority.",
+      otpTitle: "Enter your one-time code",
+      otpBody:
+        "The certificate authority's page asks for the code sent to your phone. Once you finish there, this page picks up the signature.",
+      otpReadyTitle: "Open the code page",
+      otpReadyBody: "Enter the one-time code to finish signing.",
+      openOtp: "Open code page",
+      checkResult: "Check result",
+      otpNotDone:
+        "No signature yet — the code page closed before it finished. Open it again and complete the code.",
+      popupBlocked: "Your browser blocked the pop-up. Use the link below instead.",
+      expiresIn: (remaining: string) => `Time left: ${remaining}`,
+      expired: "Time is up — start again.",
+    },
+
+    completed: {
+      title: "Signed",
+      body: "Your signature has been added to the document and sent back to the sender.",
+      documentLabel: "Document",
+      signerLabel: "Signed by",
+      signedAtLabel: "Signed at",
+      download: "Download a copy",
+      downloadHint: "For your records. The sender already has the signed document.",
+      noCopyNote: "The sender has the signed document. Ask them if you need a copy.",
+      closeHint: "You can close this page now.",
+    },
   },
 };
 

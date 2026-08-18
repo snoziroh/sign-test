@@ -24,6 +24,7 @@ import {
   userOutcomeLabel,
   verdictMeta,
 } from "./verification-ui";
+import { PrimaryChecksPanel } from "./verification-primary-checks";
 
 export function OverviewPanel({
   t,
@@ -36,18 +37,36 @@ export function OverviewPanel({
 }) {
   const rootIssues = signature.issues.filter((issue) => issue.rootCause);
   const displayedIssues = rootIssues.length > 0 ? rootIssues.slice(0, 2) : signature.issues.slice(0, 1);
-  const requiresResigning = signature.issues.some((issue) => issue.fileNeedsResigning);
+  /*
+   * CTA "ký lại" do `remediations[].requiresResigning` quyết định — đó là kết
+   * luận đã tổng hợp của backend về việc tài liệu có phải đụng tới hay không.
+   * `issues[].fileNeedsResigning` giữ lại làm nguồn thứ hai cho ca báo cáo
+   * không kèm remediation nào; cả hai đều `false` ở lỗi cấu hình verifier, nên
+   * "trust store rỗng" vẫn không đẩy người dùng đi ký lại một tệp lành lặn.
+   */
+  const requiresResigning =
+    signature.remediations.some((remediation) => remediation.requiresResigning) ||
+    signature.issues.some((issue) => issue.fileNeedsResigning);
   const scopeHasLaterRevisions =
     signature.scope?.coversCurrentDocument === false &&
     (signature.scope?.unsignedTrailingBytes ?? 0) > 0;
 
   return (
-    <div className="space-y-5 p-5">
+    <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-5">
       <SignerSummaryCard t={t} signature={signature} />
 
       <section>
         <SectionHeading title={t.verify.ux.userChecks} />
-        <UserValidationSummary t={t} signature={signature} />
+        {/*
+          Từ 6.1.0 năm thẻ lấy thẳng từ `signatures[].primaryChecks`. Nhánh dưới
+          chỉ còn phục vụ backend 6.0.x — nó tự suy từ `validation` và vì thế có
+          thể lệch với màn chi tiết, nên không được dùng khi backend đã trả sẵn.
+        */}
+        {signature.primaryChecks.length > 0 ? (
+          <PrimaryChecksPanel t={t} checks={signature.primaryChecks} onShowIssues={onShowAdvanced} />
+        ) : (
+          <UserValidationSummary t={t} signature={signature} />
+        )}
       </section>
 
       {scopeHasLaterRevisions ? (
@@ -129,8 +148,17 @@ function SignerSummaryCard({
         </span>
       </div>
 
+      {/*
+        Thời điểm ký có hai nguồn hoàn toàn khác nhau và nhãn phải nói rõ đang
+        hiện nguồn nào: `provenSigningTime` là Proof of Existence do engine
+        chứng minh, `claimedSigningTime` là giá trị người ký tự đặt lúc ký —
+        khai lùi ngày là chuyện tầm thường.
+      */}
       <dl className="grid border-t border-border-muted sm:grid-cols-2 lg:grid-cols-3">
-        <SummaryField label={t.verify.ux.signingTime} value={formatDateTime(signature.signingTime)} />
+        <SummaryField
+          label={signature.provenSigningTime ? t.verify.ux.signingTime : t.verify.ux.claimedSigningTime}
+          value={formatDateTime(signature.signingTime)}
+        />
         <SummaryField label={t.verify.result.standard} value={standardLabel(signature)} />
         <SummaryField
           label={t.verify.ux.trust}
@@ -148,6 +176,19 @@ function SignerSummaryCard({
           <span>{t.verify.banner2.signingTimeUntrusted}</span>
         </div>
       ) : null}
+
+      {/*
+        Dấu thời gian hợp lệ nhưng verifier chưa nạp anchor của TSA là trạng thái
+        có thật kể từ 6.1.0 — thẻ `TIMESTAMP_PRESENT` vẫn `PASS` trong khi
+        `trustedTime` là `false`. Badge này đọc đúng field trả lời câu hỏi đó,
+        không đọc outcome của check dấu thời gian.
+      */}
+      {signature.timestamps.length > 0 && !signature.trustedTimestampAvailable ? (
+        <div className="flex gap-2 border-t border-border-muted bg-inset px-4 py-2.5 text-[11.5px] text-fg-muted">
+          <InfoIcon size={14} className="mt-0.5 shrink-0" />
+          <span>{t.verify.ux.timestampNotTrustedTime}</span>
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -161,6 +202,11 @@ function SummaryField({ label, value }: { label: string; value: string }) {
   );
 }
 
+/**
+ * Bản tự suy của năm thẻ, chỉ dùng khi backend chưa trả `primaryChecks` (6.0.x).
+ * Giữ lại để một server cũ không làm trống hẳn màn tổng quan — không mở rộng
+ * thêm ở đây, mọi thay đổi về nội dung thẻ thuộc về backend.
+ */
 function UserValidationSummary({ t, signature }: { t: Dictionary; signature: VerificationSignature }) {
   const checks: Array<{
     key: string;

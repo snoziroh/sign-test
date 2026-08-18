@@ -12,24 +12,20 @@ import {
   UsersIcon,
   XIcon,
 } from "@/components/ui/icons";
-import { algorithmLabel, groupAlgorithms } from "@/features/signing/signature-algorithm";
 import type { SignaturePosition } from "@/features/signing/components/sign-document-preview";
 import { avatarTone, initialsOf, searchDirectory } from "../directory";
 import {
-  ALGORITHM_IDS,
   BASELINE_LEVELS,
   LINK_SIGN_METHODS,
-  SIGN_METHODS,
   type FlowStep,
   type SignatureSlot,
-  type SignMethodId,
   type SlotSigner,
 } from "../model";
 import { PdfPositionPicker, type GhostBox } from "./pdf-position-picker";
 
 /**
- * Cấu hình của MỘT ô chữ ký: ai ký, xác thực bằng gì, ký ra chữ ký như thế nào,
- * và nếu là PDF thì khung chữ ký nằm ở đâu trên trang.
+ * Cấu hình của MỘT ô chữ ký: ai ký, ký ra chữ ký như thế nào, và nếu là PDF thì
+ * khung chữ ký nằm ở đâu trên trang.
  *
  * Hộp thoại chứ không phải một khối mở rộng tại chỗ: sơ đồ luồng là thứ người
  * dùng cần nhìn tổng thể, và một ô phình ra giữa hàng sẽ đẩy mọi ô khác đi chỗ
@@ -48,6 +44,7 @@ export function SlotConfigDialog({
   document,
   documentFormat,
   readOnly = false,
+  lockPlacement = false,
   onPatch,
   onMoveToStep,
   onRemove,
@@ -61,10 +58,22 @@ export function SlotConfigDialog({
   document?: File;
   documentFormat?: DocumentFormat;
   readOnly?: boolean;
+  /**
+   * Ô đến từ một mẫu đã publish: đổi được NGƯỜI ký, không đổi được CHỖ ký hay
+   * bước.
+   *
+   * Khác `readOnly` (khoá tất cả, dùng cho màn tiến trình) ở đúng chỗ đó. Lý do
+   * là ràng buộc của backend: yêu cầu ký từ mẫu chép toạ độ và thứ tự từ bản đã
+   * publish và từ chối nếu client gửi kèm. Cho kéo khung chữ ký rồi vứt kết quả
+   * đi là hứa một điều không giữ được.
+   */
+  lockPlacement?: boolean;
   onPatch: (patch: Partial<Omit<SignatureSlot, "id">>) => void;
   onMoveToStep: (stepId: string) => void;
   onRemove: () => void;
 }) {
+  /** Khoá mọi thứ thuộc về CẤU TRÚC: bước, vị trí khung, và nút xoá ô. */
+  const placementLocked = readOnly || lockPlacement;
   const g = t.signRequest.config;
   const signer = slot.signer;
   const [mode, setMode] = useState<"system" | "link">(signer?.kind === "link" ? "link" : "system");
@@ -72,7 +81,6 @@ export function SlotConfigDialog({
   const users = useMemo(() => searchDirectory(query), [query]);
 
   const isPdf = documentFormat === "PDF";
-  const methods = mode === "link" ? LINK_SIGN_METHODS : SIGN_METHODS;
 
   /** Khung của những người ký khác — vẽ mờ để không ai đặt chồng lên ai. */
   const ghosts: GhostBox[] = steps.flatMap((step) =>
@@ -123,7 +131,7 @@ export function SlotConfigDialog({
       open={open}
       onClose={onClose}
       label={readOnly ? g.titleReadonly : g.title}
-      className="max-w-[64rem]!"
+      className="max-w-5xl!"
     >
       <header className="flex items-start gap-3 border-b border-border-muted px-5 py-3.5">
         <div className="flex-1">
@@ -133,12 +141,15 @@ export function SlotConfigDialog({
           <p className="mt-0.5 font-mono text-[11px] text-fg-subtle">
             {g.inStep(stepIndex + 1)}
             {/* Người ký qua link vừa tạo chưa có tên lẫn email — đừng để lại
-                dấu chấm giữa lơ lửng. */}
-            {signerLabel(signer) ? ` · ${signerLabel(signer)}` : ""}
+                dấu chấm giữa lơ lửng. Ô đến từ mẫu thì tên vai đã đủ để biết
+                mình đang cấu hình chỗ ký nào. */}
+            {signerLabel(signer) || slot.roleName
+              ? ` · ${signerLabel(signer) || slot.roleName}`
+              : ""}
           </p>
         </div>
 
-        {!readOnly && steps.length > 1 ? (
+        {!placementLocked && steps.length > 1 ? (
           <label className="flex items-center gap-2 text-[11.5px] font-semibold text-fg-muted">
             {g.stepFieldLabel}
             <select
@@ -173,7 +184,7 @@ export function SlotConfigDialog({
             <SectionTitle>{g.signerSection}</SectionTitle>
 
             {!readOnly ? (
-              <div role="group" className="inline-flex gap-0.5 self-start rounded-lg bg-inset p-[3px]">
+              <div role="group" className="inline-flex gap-0.5 self-start rounded-lg bg-inset p-0.75">
                 {(["system", "link"] as const).map((value) => (
                   <button
                     key={value}
@@ -289,43 +300,15 @@ export function SlotConfigDialog({
           <section className="flex flex-col gap-3">
             <SectionTitle>{g.signatureSection}</SectionTitle>
 
-            <Field
-              label={g.methodLabel}
-              hint={mode === "link" ? g.methodHintLink : g.method[slot.config.method].hint}
-            >
-              <select
-                disabled={readOnly}
-                value={slot.config.method}
-                onChange={(event) => patchConfig({ method: event.target.value as SignMethodId })}
-                className={inputClass}
-              >
-                {methods.map((method) => (
-                  <option key={method} value={method}>
-                    {g.method[method].label}
-                  </option>
-                ))}
-              </select>
-            </Field>
+            {/* Cách xác thực không còn chọn tay: người ký tự chọn nguồn khoá
+                ngay trên trang ký, nên mặc định trong `config` (theo hệ thống
+                hay theo link) là lựa chọn duy nhất giữ được lời hứa. Giá trị đó
+                vẫn gửi lên nguyên vẹn. */}
 
-            <Field label={g.algorithmLabel} hint={g.algorithmHint}>
-              <select
-                disabled={readOnly}
-                value={slot.config.algorithm}
-                onChange={(event) => patchConfig({ algorithm: event.target.value })}
-                className={inputClass}
-              >
-                {groupAlgorithms([...ALGORITHM_IDS]).map((group) => (
-                  <optgroup key={group.scheme} label={group.scheme}>
-                    {group.options.map((option) => (
-                      <option key={option.id} value={option.id}>
-                        {algorithmLabel(option.id)}
-                      </option>
-                    ))}
-                  </optgroup>
-                ))}
-              </select>
-            </Field>
-
+            {/* Thuật toán không còn chọn tay: danh sách thật đến từ
+                /capabilities của dịch vụ ký và bị lọc theo định dạng tài liệu,
+                nên mặc định trong `config` là lựa chọn duy nhất giữ được lời
+                hứa. Giá trị đó vẫn gửi lên nguyên vẹn. */}
             <Field label={g.baselineLabel} hint={g.baseline[slot.config.baselineLevel].hint}>
               <select
                 disabled={readOnly}
@@ -373,10 +356,10 @@ export function SlotConfigDialog({
           <label className="flex cursor-pointer items-start gap-2.5">
             <input
               type="checkbox"
-              disabled={readOnly}
+              disabled={placementLocked}
               checked={slot.config.visible}
               onChange={(event) => patchConfig({ visible: event.target.checked })}
-              className="mt-0.5 size-4 accent-[var(--accent)]"
+              className="mt-0.5 size-4 accent-accent"
             />
             <span>
               <span className="block text-[12.5px] font-semibold text-fg">{g.visibleLabel}</span>
@@ -401,7 +384,7 @@ export function SlotConfigDialog({
                   position={slot.config.position}
                   onChange={(position: SignaturePosition) => patchConfig({ position })}
                   others={ghosts}
-                  readOnly={readOnly}
+                  readOnly={placementLocked}
                 />
               </div>
             )
@@ -410,7 +393,7 @@ export function SlotConfigDialog({
       </div>
 
       <footer className="flex items-center justify-between gap-3 border-t border-border-muted bg-surface-2 px-5 py-3">
-        {!readOnly ? (
+        {!placementLocked ? (
           <button
             type="button"
             onClick={() => {
@@ -451,7 +434,7 @@ function signerLabel(signer?: SlotSigner): string {
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
-    <h3 className="font-mono text-[10.5px] uppercase tracking-[0.1em] text-fg-subtle">
+    <h3 className="font-mono text-[10.5px] uppercase tracking-widest text-fg-subtle">
       {children}
     </h3>
   );

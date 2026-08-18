@@ -24,11 +24,14 @@ import {
  * nhận trên điện thoại. Không có phiên, không có bước tiếp: hộp thoại chỉ đếm
  * ngược và chờ đúng một promise.
  *
- * `REDIRECT_OTP` (FPT eSign Cloud) — ba pha, và chính người dùng bấm để đi tiếp.
- * Vì sao KHÔNG tự động chạy tiếp từ `PENDING_IDENTITY`: bước đó là API tạo giao
- * dịch bên FPT — mỗi lần gọi thêm một billCode và trừ một lượt ký. Lưu ý stage
- * đó KHÔNG luôn có nghĩa "chưa xác nhận danh tính": một agreement đã READY vẫn
- * bắt đầu ở đây, nên `agreementReady` quyết định hộp thoại nói gì.
+ * `REDIRECT_OTP` (FPT eSign Cloud) — ba pha, nhưng hộp thoại tự đi hết pha đầu:
+ * mở lên là chạy START rồi CONTINUE ngay, để thứ người ký thấy đầu tiên là nút
+ * mở trang OTP chứ không phải một màn "phiên đã mở, bấm để tạo giao dịch" mà họ
+ * chẳng có gì để quyết ở đó. Cái giá: CONTINUE từ `PENDING_IDENTITY` là API tạo
+ * giao dịch bên FPT — thêm một billCode, trừ một lượt ký — nên nhịp tự động này
+ * chạy ĐÚNG MỘT LẦN lúc mở. Hỏng (thường vì danh tính chưa xác nhận thật) thì
+ * hộp thoại ở lại chính stage vừa mở kèm lỗi, và `agreementReady` quyết định
+ * stage đó nói gì.
  *
  * Từ `PENDING_OTP` cũng KHÔNG tự chạy tiếp, dù lấy chữ ký là thao tác chỉ đọc:
  * mỗi lần chạy thay `pending` bằng phản hồi mới, mà phản hồi chờ-OTP không mang
@@ -56,7 +59,14 @@ interface SignSessionDialogProps {
   agreementReady?: boolean;
   /** Bước đầu tiên: START mới, hoặc CONTINUE khi khôi phục một phiên còn sống. */
   begin: SessionStep;
-  continueSession: (sessionId: string) => Promise<SignResponse>;
+  /**
+   * `sessionId` vắng mặt ở luồng ký công khai (`features/external-signing`):
+   * phiên ở đó sống trong cookie, và `PublicSignResponse.sessionId` LUÔN là
+   * `null` — CONTINUE không cần id nào để biết tiếp tục phiên nào. Hộp thoại
+   * này vì thế không còn coi `sessionId` là điều kiện "có phiên để tiếp tục";
+   * xem `pending` ở nơi gọi.
+   */
+  continueSession: (sessionId?: string) => Promise<SignResponse>;
   /** Gọi sau MỌI phản hồi còn dở dang — nơi lưu `sessionId` để khôi phục được. */
   onPending: (response: SignResponse) => void;
   onCompleted: (response: SignResponse) => void;
@@ -177,14 +187,16 @@ export function SignSessionDialog({
   );
 
   /**
-   * Bước đầu, rồi đi thẳng tới OTP nếu agreement đã READY.
+   * Bước đầu, rồi đi thẳng tới OTP.
    *
    * 💸 CONTINUE từ `PENDING_IDENTITY` TẠO GIAO DỊCH: thêm billCode, trừ một lượt
-   * ký. Chỉ tự chạy khi danh tính đã xác nhận xong từ trước — khi đó stage này
-   * không còn là một quyết định, người ký chẳng có gì để làm ở đó, và cú bấm
-   * "đi tiếp" chỉ là một lần chạm thừa giữa "Ký tài liệu" và trang OTP. Còn
-   * `UNKNOWN` (uuid dán tay, uuid khôi phục) thì KHÔNG: danh tính có thể chưa
-   * xác nhận thật, và giao dịch mở ra lúc đó là một lượt ký ném đi.
+   * ký. Vẫn chạy tự động vì stage đó không hỏi người ký điều gì — nó chỉ là một
+   * cú chạm thừa giữa "Ký tài liệu" và trang OTP. Hỏng thì `pending` ở lại stage
+   * vừa mở và lỗi hiện ngay trên nó, nên lối "mở trang xác nhận danh tính" vẫn
+   * còn nguyên cho hồ sơ thật sự chưa xác nhận.
+   *
+   * KHÔNG đòi `sessionId`: luồng ký công khai giữ phiên trong cookie và luôn trả
+   * `sessionId` rỗng — đòi nó ở đây là tắt hẳn nhịp tự động bên `/external-sign`.
    *
    * Chuỗi ngay trong bước đầu chứ không tách effect: `startedRef` đã chặn chạy
    * hai lần dưới StrictMode, và không có khoảng hở nào để hộp thoại kịp vẽ một
@@ -195,13 +207,10 @@ export function SignSessionDialog({
     startedRef.current = true;
 
     void run(begin).then((response) => {
-      if (!agreementReady) return;
       if (response?.status !== "PENDING_IDENTITY") return;
-      const openedSession = response.sessionId;
-      if (!openedSession) return;
-      void run(() => continueSession(openedSession));
+      void run(() => continueSession(response.sessionId));
     });
-  }, [begin, run, agreementReady, continueSession]);
+  }, [begin, run, continueSession]);
 
   const sessionId = pending?.sessionId;
   const billable = pending ? continueIsBillable(pending.status) : false;
@@ -216,7 +225,7 @@ export function SignSessionDialog({
    * trước khi OTP được chấp nhận, và họ cần mở lại để làm lại.
    */
   useEffect(() => {
-    if (!awaitingOtpWindow || !sessionId) return;
+    if (!awaitingOtpWindow || !pending) return;
     const id = window.setInterval(() => {
       if (otpWindowRef.current && !otpWindowRef.current.closed) return;
       window.clearInterval(id);
@@ -227,7 +236,7 @@ export function SignSessionDialog({
       });
     }, 700);
     return () => window.clearInterval(id);
-  }, [awaitingOtpWindow, sessionId, run, continueSession]);
+  }, [awaitingOtpWindow, pending, sessionId, run, continueSession]);
 
   const remaining = useCountdown(pending?.expiresAt ?? appDeadline);
 
@@ -244,13 +253,21 @@ export function SignSessionDialog({
       </div>
 
       <div className="space-y-3 px-5 py-4">
+        {/*
+          Lỗi KHÔNG thay thế stage đang mở: nhịp tự động chạy tiếp có thể hỏng
+          ngay sau khi phiên vừa mở, và lúc đó thứ người ký cần là cái nút mở
+          trang của CA — giấu nó đi để nhường chỗ cho một câu báo lỗi là bỏ họ
+          lại giữa một giao dịch đã trả tiền mà không còn đường đi tiếp.
+        */}
         {error ? (
           <ErrorBlock
             error={error}
             correlationLabel={s.correlationId}
             note={error.code === "SIGN_SESSION_NOT_FOUND" ? s.sessionLostNote : undefined}
           />
-        ) : busy ? (
+        ) : null}
+
+        {busy ? (
           <PendingBlock
             title={
               interactionModel === "APP_CONFIRMATION" ? s.appWaiting : s.working
@@ -280,11 +297,11 @@ export function SignSessionDialog({
           </p>
         ) : null}
 
-        {pending ? (
+        {pending && sessionId ? (
           <dl className="rounded-md bg-inset px-3 py-2 text-[10.5px] text-fg-muted">
             <div className="flex justify-between gap-3">
               <dt>{s.sessionIdLabel}</dt>
-              <dd className="truncate font-mono">{pending.sessionId ?? "—"}</dd>
+              <dd className="truncate font-mono">{sessionId}</dd>
             </div>
           </dl>
         ) : null}
@@ -294,7 +311,7 @@ export function SignSessionDialog({
         <button type="button" onClick={onClose} className={dialogButtonClass(false)}>
           {s.close}
         </button>
-        {sessionId && !busy ? (
+        {pending && !busy ? (
           <button
             type="button"
             onClick={() => run(() => continueSession(sessionId))}

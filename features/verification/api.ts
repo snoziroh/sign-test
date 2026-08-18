@@ -13,7 +13,7 @@ import type { Dictionary } from "@/lib/i18n";
  * phải của dịch vụ ký — hai service, hai ô cấu hình.
  */
 
-const MAX_FILE_SIZE = 32 * 1024 * 1024; // 32 MiB — VERIFICATION_MAX_FILE_SIZE mặc định
+const MAX_FILE_SIZE = 50 * 1024 * 1024; // 32 MiB — VERIFICATION_MAX_FILE_SIZE mặc định
 
 /**
  * Mã tra cứu gửi kèm mọi lời gọi verify. Backend echo lại nguyên văn, nên đây là

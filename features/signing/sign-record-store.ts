@@ -18,11 +18,27 @@ import type { MaterialMode, RemoteCaVendor, SignStatus } from "@/lib/types/signi
  * trước": nó thuộc về một lần ký CHƯA XONG mà tiền đã trả rồi.
  */
 
-const SESSION_KEY = "sign:session:v1";
 const AGREEMENT_KEY = "sign:agreement-uuid:v1";
 
+/**
+ * Không gian lưu trữ — mặc định `"sign"` (màn `/sign` nội bộ, khoá
+ * `sign:session:v1` như trước). `features/external-signing` truyền
+ * `"external-sign"` để không đụng khoá với màn `/sign` khi cả hai cùng mở
+ * trên một trình duyệt.
+ */
+export type SignSessionNamespace = "sign" | "external-sign";
+
+function sessionKey(namespace: SignSessionNamespace): string {
+  return `${namespace}:session:v1`;
+}
+
 export interface SignSessionRecord {
-  sessionId: string;
+  /**
+   * Vắng mặt ở luồng ký công khai: phiên sống trong cookie,
+   * `PublicSignResponse.sessionId` luôn là `null`, và CONTINUE không cần id
+   * nào để biết tiếp tục phiên nào — xem `toPublicContinueRequest`.
+   */
+  sessionId?: string;
   materialMode: MaterialMode;
   vendor?: RemoteCaVendor;
   /** Stage lần cuối biết được — quyết định CONTINUE tiếp theo có tốn phí không. */
@@ -73,22 +89,25 @@ function remove(key: string): void {
 }
 
 /** Phiên sống 15 phút bên server; quá hạn thì không đề nghị khôi phục nữa. */
-export function loadSessionRecord(): SignSessionRecord | null {
-  const record = readJson<SignSessionRecord>(SESSION_KEY);
-  if (!record?.sessionId) return null;
+export function loadSessionRecord(namespace: SignSessionNamespace = "sign"): SignSessionRecord | null {
+  const record = readJson<SignSessionRecord>(sessionKey(namespace));
+  if (!record?.materialMode) return null;
   if (record.expiresAt && Date.parse(record.expiresAt) < Date.now()) {
-    remove(SESSION_KEY);
+    remove(sessionKey(namespace));
     return null;
   }
   return record;
 }
 
-export function saveSessionRecord(record: SignSessionRecord): void {
-  writeJson(SESSION_KEY, record);
+export function saveSessionRecord(
+  record: SignSessionRecord,
+  namespace: SignSessionNamespace = "sign",
+): void {
+  writeJson(sessionKey(namespace), record);
 }
 
-export function clearSessionRecord(): void {
-  remove(SESSION_KEY);
+export function clearSessionRecord(namespace: SignSessionNamespace = "sign"): void {
+  remove(sessionKey(namespace));
 }
 
 /**

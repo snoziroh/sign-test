@@ -131,6 +131,33 @@ export function CheckIcon(props: IconProps) {
   );
 }
 
+export function HelpCircleIcon(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <circle cx="12" cy="12" r="10" />
+      <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+      <path d="M12 17h.01" />
+    </svg>
+  );
+}
+
+export function CircleSlashIcon(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <circle cx="12" cy="12" r="10" />
+      <path d="m4.9 4.9 14.2 14.2" />
+    </svg>
+  );
+}
+
+export function MinusIcon(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M5 12h14" />
+    </svg>
+  );
+}
+
 export function ConstructionIcon(props: IconProps) {
   return (
     <svg {...base(props)}>
@@ -212,6 +239,20 @@ export function PasskeyIcon(props: IconProps) {
   );
 }
 
+export function UsbIcon(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <circle cx="10" cy="7" r="1" />
+      <circle cx="4" cy="20" r="1" />
+      <path d="M4.7 19.3 19 5" />
+      <path d="m21 3-3 1 2 2Z" />
+      <path d="M9.26 7.68 5 12l2 5" />
+      <path d="m10 14 5 2 3.5-3.5" />
+      <path d="m18 12 1-1 1 1-1 1Z" />
+    </svg>
+  );
+}
+
 export function LogOutIcon(props: IconProps) {
   return (
     <svg {...base(props)}>
@@ -228,6 +269,16 @@ export function DownloadIcon(props: IconProps) {
       <path d="M12 3v12" />
       <path d="m7 10 5 5 5-5" />
       <path d="M5 21h14" />
+    </svg>
+  );
+}
+
+export function UploadCloudIcon(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M12 13v8" />
+      <path d="m8 17 4-4 4 4" />
+      <path d="M20 16.58A5 5 0 0 0 18 7h-1.26A8 8 0 1 0 4 15.25" />
     </svg>
   );
 }
@@ -323,6 +374,17 @@ export function LinkIcon(props: IconProps) {
     <svg {...base(props)}>
       <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
       <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+    </svg>
+  );
+}
+
+/** Mở ở cửa sổ/tab khác — dùng cho nút dẫn sang trang của nhà cung cấp chứng thư. */
+export function ExternalLinkIcon(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M15 3h6v6" />
+      <path d="M10 14 21 3" />
+      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
     </svg>
   );
 }

@@ -38,7 +38,23 @@ const DEFAULT_TIMEOUT_MS = 15_000;
  */
 export const SIGN_WAIT_TIMEOUT_MS = 345_000;
 
-const FORWARDED_RESPONSE_HEADERS = ["retry-after", "x-correlation-id"] as const;
+/**
+ * `POST /api/templates` chuyển DOCX/XLSX sang PDF ngay trong request, qua
+ * Gotenberg với `read-timeout: 60s`. Cộng thêm phần đọc gói OOXML, dựng bản
+ * highlight và ghi lên object storage thì một mẫu nặng vượt xa hạn 15 giây mặc
+ * định — và cắt sớm ở đây tạo ra thứ tệ nhất: proxy trả 502 trong khi backend
+ * vẫn chạy nốt và vẫn tạo ra một template DRAFT thật.
+ */
+export const TEMPLATE_CONVERT_TIMEOUT_MS = 120_000;
+
+const FORWARDED_RESPONSE_HEADERS = [
+  "retry-after",
+  "x-correlation-id",
+  "idempotent-replay",
+] as const;
+
+/** Hàm khởi tạo `Response` cấm thân với các mã này. */
+const NULL_BODY_STATUSES = new Set([204, 205, 304]);
 
 /** Dịch vụ ký không tiếp cận được: backend tắt, DNS/TCP lỗi, hoặc timeout. */
 export class SigningApiUnavailableError extends Error {
@@ -158,11 +174,102 @@ export async function proxySignJson(
   try {
     const baseUrl = resolveBaseUrl(request);
     const response = await signApiFetch(baseUrl, path, init);
+
+    /*
+     * Các lệnh ghi của phân hệ mẫu (`PUT …/fields`, `PUT …/signers`, `DELETE`)
+     * trả `204 No Content`. Dựng `NextResponse.json()` cho chúng là ném
+     * TypeError ngay tại đây — hàm khởi tạo Response cấm thân với 204/205/304 —
+     * và một lời gọi vừa THÀNH CÔNG sẽ hiện ra ở client thành lỗi 502 của proxy.
+     */
+    if (NULL_BODY_STATUSES.has(response.status)) {
+      return new NextResponse(null, {
+        status: response.status,
+        headers: copyHeaders(response),
+      });
+    }
+
     const body = await response.json().catch(() => ({}));
     return NextResponse.json(body, {
       status: response.status,
       headers: copyHeaders(response),
     });
+  } catch (error) {
+    return signErrorResponse(error);
+  }
+}
+
+/**
+ * Header danh tính + quyền ký của phân hệ quy trình ký. Dịch vụ không có xác
+ * thực nên `X-Username` là thứ nói cho backend biết ai đang thao tác — nó đi
+ * vào audit log và vào quyền đọc tài liệu của yêu cầu ký. `X-Signing-Lease-Token`
+ * đi kèm ở bước START/USB-prepare/DELETE lease, đại diện cho đúng lượt giành
+ * quyền ký vừa `POST /sign/lease`.
+ *
+ * Chuyển tiếp nguyên văn thay vì để proxy tự đặt: người dùng chọn danh tính trên
+ * giao diện, và một proxy tự ý điền tên khác là làm sai lệch chính cái log mà
+ * header này sinh ra. Header lease token cũng vậy — proxy không được tự sinh
+ * hay tự bỏ nó.
+ */
+const FORWARDED_ACTOR_HEADERS = [
+  "x-username",
+  "idempotency-key",
+  "x-signing-lease-token",
+] as const;
+
+export function actorHeaders(request: { headers: Headers }): Headers {
+  const headers = new Headers();
+  for (const name of FORWARDED_ACTOR_HEADERS) {
+    const value = request.headers.get(name);
+    if (value) headers.set(name, value);
+  }
+  return headers;
+}
+
+/**
+ * Chuyển tiếp một lời gọi trả về TỆP (`…/document`, `…/preview`,
+ * `…/content`).
+ *
+ * Không đi qua `proxySignJson` được vì thân là nhị phân, và không đọc thành text
+ * được vì PDF vỡ ngay. `ETag` cùng `304` được giữ nguyên: các endpoint này đều
+ * gắn ETag theo sha256 của nội dung, và nuốt mất nó biến mỗi lần mở lại màn hình
+ * thành một lần tải lại cả tệp.
+ */
+export async function proxySignBinary(
+  request: { headers: Headers },
+  path: string,
+  init: RequestInit = {},
+): Promise<Response> {
+  try {
+    const baseUrl = resolveBaseUrl(request);
+    const headers = new Headers(init.headers);
+    const ifNoneMatch = request.headers.get("if-none-match");
+    if (ifNoneMatch) headers.set("If-None-Match", ifNoneMatch);
+
+    const response = await signApiFetch(baseUrl, path, { ...init, headers });
+
+    /*
+     * Lỗi của backend là problem+json chứ không phải tệp, nên trả lại như JSON
+     * để client đọc được `code` bằng đúng một đường như mọi lời gọi khác.
+     */
+    if (!response.ok && response.status !== 304) {
+      const body = await response.json().catch(() => ({}));
+      return NextResponse.json(body, {
+        status: response.status,
+        headers: copyHeaders(response),
+      });
+    }
+
+    const out = copyHeaders(response);
+    for (const name of ["content-type", "etag", "content-disposition"] as const) {
+      const value = response.headers.get(name);
+      if (value) out.set(name, value);
+    }
+    // Nội dung của yêu cầu ký là dữ liệu riêng của người dùng: không để proxy
+    // hay CDN nào giữ lại một bản.
+    out.set("Cache-Control", "no-store, private");
+
+    if (response.status === 304) return new Response(null, { status: 304, headers: out });
+    return new Response(await response.arrayBuffer(), { status: response.status, headers: out });
   } catch (error) {
     return signErrorResponse(error);
   }

@@ -7,7 +7,7 @@ import type {
   CheckOutcome,
   VerificationReport,
 } from "@/lib/types/verification";
-import { AlertCircleIcon, AlertTriangleIcon } from "@/components/ui/icons";
+import { AlertCircleIcon, AlertTriangleIcon, InfoIcon } from "@/components/ui/icons";
 import type { Dictionary } from "@/lib/i18n";
 import {
   OutcomeIcon,
@@ -170,6 +170,18 @@ export function VerificationResultHeader({
           <p className="mt-1.5 max-w-3xl text-[12.5px] leading-relaxed text-fg-muted">
             {reportSummarySentence(t, report)}
           </p>
+
+          {/*
+            `TOTAL_PASSED` + `PARTIAL` là trạng thái có thật và người đọc cần
+            biết: kết luận đạt, nhưng không phải bước nào cũng chạy hết. Ẩn dòng
+            này là để người dùng tin rằng mọi thứ đã được kiểm tra.
+          */}
+          {report.completeness === "PARTIAL" ? (
+            <p className="mt-1.5 flex items-center gap-1.5 text-[11.5px] text-fg-muted">
+              <InfoIcon size={13} className="shrink-0" />
+              {t.verify.report.completenessValue.PARTIAL}
+            </p>
+          ) : null}
         </div>
 
         <span className="rounded-full bg-surface px-2.5 py-1 text-[10.5px] font-semibold text-fg-muted shadow-sm">

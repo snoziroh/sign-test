@@ -32,6 +32,15 @@ export function Dialog({
   const panelRef = useRef<HTMLDivElement>(null);
   const previousFocus = useRef<HTMLElement | null>(null);
 
+  /**
+   * HAI effect chứ không một, và khác nhau ở đúng chỗ `onClose`.
+   *
+   * Phần lớn nơi gọi truyền vào một closure mới mỗi lần render. Gộp chung thì
+   * mỗi ký tự gõ vào một ô input trong hộp thoại sẽ dọn dẹp rồi chạy lại effect
+   * — tức là trả focus rồi kéo nó về phần tử focus được đầu tiên (nút đóng) sau
+   * đúng một ký tự. Tách ra: focus chỉ phụ thuộc `open`, còn listener đăng ký
+   * lại bao nhiêu lần cũng không ai thấy.
+   */
   useEffect(() => {
     if (!open) return;
     previousFocus.current = document.activeElement as HTMLElement | null;
@@ -39,6 +48,15 @@ export function Dialog({
     const panel = panelRef.current;
     const first = panel?.querySelector<HTMLElement>(FOCUSABLE);
     (first ?? panel)?.focus();
+
+    return () => {
+      previousFocus.current?.focus();
+    };
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const panel = panelRef.current;
 
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
@@ -61,10 +79,7 @@ export function Dialog({
     };
 
     document.addEventListener("keydown", onKeyDown, true);
-    return () => {
-      document.removeEventListener("keydown", onKeyDown, true);
-      previousFocus.current?.focus();
-    };
+    return () => document.removeEventListener("keydown", onKeyDown, true);
   }, [open, onClose]);
 
   if (!open) return null;

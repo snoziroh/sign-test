@@ -94,6 +94,19 @@ export type CheckOutcome =
 
 export type ValidationCompleteness = "COMPLETE" | "PARTIAL" | "NOT_PERFORMED";
 
+/**
+ * Năm thẻ của màn hình kết quả — mới ở 6.1.0. Tập mở có chủ đích: một bản minor
+ * sau có thể thêm thẻ, nên giao diện phải khoá theo `id` chứ không theo index và
+ * phải có nhánh hiển thị cho `id` lạ.
+ */
+export type PrimaryCheckId =
+  | "INTEGRITY"
+  | "TRUSTED_SIGNATURE"
+  | "SIGNED_WITHIN_VALIDITY"
+  | "TIMESTAMP_PRESENT"
+  | "CERTIFICATE_NOT_REVOKED"
+  | (string & {});
+
 export type IssueSeverity = "INFO" | "WARNING" | "ERROR" | "CRITICAL";
 
 export type IssueCategory =
@@ -309,9 +322,30 @@ export interface ValidationContextV6 {
   piiExposureMode?: PiiExposureMode | null;
 }
 
+/**
+ * Mới ở 6.1.0. KHÔNG phải phép kiểm tra thứ hai: mỗi thẻ lấy nguyên kết quả của
+ * `checks[]` và trỏ ngược về đó qua `derivedFromCheckIds`, nên màn tóm tắt không
+ * bao giờ nói khác màn chi tiết. Mọi quyết định của client dựa vào `id` và
+ * `outcome`; `title`/`detail` là câu chữ để hiện, không phải để parse.
+ */
+export interface PrimaryCheckV6 {
+  id?: PrimaryCheckId | null;
+  outcome?: CheckOutcome | null;
+  title?: string | null;
+  detail?: string | null;
+  derivedFromCheckIds?: string[] | null;
+  issueIds?: string[] | null;
+}
+
 export interface SummaryV6 {
   etsi: EtsiV6;
   validationCompleteness?: ValidationCompleteness | null;
+  /**
+   * Mới ở 6.1.0 — kết quả XẤU NHẤT trên mọi chữ ký, theo thứ tự
+   * `FAIL` → `INDETERMINATE` → `NOT_EVALUATED` → `UNSUPPORTED` → `WARNING` →
+   * `NOT_APPLICABLE` → `PASS`. Bản của riêng từng chữ ký ở `signatures[].primaryChecks`.
+   */
+  primaryChecks?: (PrimaryCheckV6 | null)[] | null;
   signatureStatistics?: {
     detected: number;
     processed: number;
@@ -524,6 +558,8 @@ export interface SignatureV6 {
     missingForLta?: string[] | null;
   };
   validation: SignatureValidationV6;
+  /** Mới ở 6.1.0 — cùng hình dạng với `summary.primaryChecks`, nhưng của riêng chữ ký này. */
+  primaryChecks?: (PrimaryCheckV6 | null)[] | null;
   scope?: ScopeV6;
   claimedProperties?: {
     signingTime?: {
@@ -751,6 +787,25 @@ export interface VerificationRemediation {
   networkRequirement: NetworkRequirement;
 }
 
+/**
+ * Một thẻ của tầng 2 — lớp trình bày do backend tổng hợp sẵn (6.1.0).
+ *
+ * Giao diện KHÔNG tự suy lại năm thẻ này từ `checks[]`: tự suy là cách chắc chắn
+ * để màn tổng quan và màn chi tiết nói khác nhau. `issues` đã resolve từ
+ * `issueIds` để chỗ hiển thị không phải tự dựng map.
+ */
+export interface PrimaryCheck {
+  id: PrimaryCheckId;
+  outcome: CheckOutcome | null;
+  /** Câu chữ của backend (tiếng Việt). Dùng làm nhãn dự phòng cho `id` chưa có trong từ điển. */
+  title: string | null;
+  /** Lý do cụ thể của chính ca này — thứ duy nhất nói được "vì sao INDETERMINATE". */
+  detail: string | null;
+  /** Trỏ về `signatures[].checks[]` để mở màn chi tiết đúng bước. */
+  derivedFromCheckIds: string[];
+  issues: VerificationIssue[];
+}
+
 export interface SignatureCheck {
   checkId: string;
   type?: ValidationCheckType | null;
@@ -875,9 +930,31 @@ export interface VerificationSignature {
   achievedBaselineLevel?: string | null;
   missingForNextLevel: string[];
   relation?: SignatureV6["relation"] | null;
+  /** `provenSigningTime` nếu có, ngược lại `claimedSigningTime`. Xem hai field đó trước khi hiển thị. */
   signingTime?: string | null;
-  /** Thời điểm ký chỉ đáng tin khi có timestamp neo được — đừng hiện nó như sự thật. */
+  /**
+   * `timeValidation.bestSignatureTime` — Proof of Existence. `null` nghĩa là
+   * KHÔNG có bằng chứng độc lập nào về thời điểm ký, không phải "chưa lấy được".
+   */
+  provenSigningTime?: string | null;
+  /**
+   * `claimedProperties.signingTime` — người ký tự đặt giá trị này lúc ký. Khai lùi
+   * ngày là chuyện tầm thường, nên nó phải được gắn nhãn "người ký khai" chứ không
+   * hiện như một sự thật đã xác minh.
+   */
+  claimedSigningTime?: string | null;
+  /** `true` chỉ khi có Proof of Existence — tức `provenSigningTime` khác `null`. */
   signingTimeTrusted: boolean;
+  /**
+   * `timestamps[0].trustedTime` — verifier có nhận `genTime` làm mốc thời gian không.
+   *
+   * KHÁC hẳn "có dấu thời gian hợp lệ" (`primaryChecks[TIMESTAMP_PRESENT]` /
+   * `checks[…006]`): từ 6.1.0 một token hoàn toàn hợp lệ vẫn có `trustedTime: false`
+   * khi verifier chưa nạp anchor của TSA. Badge "mốc thời gian tin cậy" đọc field này.
+   */
+  trustedTimestampAvailable: boolean;
+  /** Năm thẻ của riêng chữ ký này (6.1.0). Rỗng khi backend còn ở 6.0.x. */
+  primaryChecks: PrimaryCheck[];
   signer?: {
     commonName: string;
     distinguishedName: string;
@@ -940,6 +1017,11 @@ export interface VerificationReport {
   subIndications: SubIndication[];
   /** `PARTIAL` = có bước chưa chạy hết. Một chữ ký `TOTAL_FAILED` vẫn có thể `COMPLETE`. */
   completeness?: ValidationCompleteness | null;
+  /**
+   * Năm thẻ cấp tài liệu (6.1.0) — kết quả xấu nhất trên mọi chữ ký. Rỗng khi
+   * backend còn ở 6.0.x; giao diện phải chịu được mảng rỗng chứ không tự suy lại.
+   */
+  primaryChecks: PrimaryCheck[];
   contentType: VerificationContentType;
   fileName: string;
   fileSize: number;
@@ -1048,6 +1130,29 @@ function resolveIssues(ids: string[] | undefined, index: ReportIndex): Verificat
     .map((id) => index.issueById.get(id))
     .filter((issue): issue is IssueV6 => Boolean(issue))
     .map(adaptIssue);
+}
+
+/**
+ * Năm thẻ 6.1.0. Giữ NGUYÊN thứ tự backend trả về: thứ tự đó đã ổn định, và tự
+ * sắp lại theo một danh sách cứng ở đây sẽ đẩy mọi thẻ mới của bản minor sau
+ * xuống cuối một cách tuỳ tiện. Phần tử không có `id` bị loại — không có `id`
+ * thì không khoá được, mà khoá theo index chính là lỗi mà mục 3.1 của hướng dẫn
+ * cảnh báo.
+ */
+function adaptPrimaryChecks(
+  checks: (PrimaryCheckV6 | null)[] | null | undefined,
+  index: ReportIndex,
+): PrimaryCheck[] {
+  return (checks ?? [])
+    .filter((check): check is PrimaryCheckV6 & { id: PrimaryCheckId } => Boolean(check?.id))
+    .map((check) => ({
+      id: check.id,
+      outcome: check.outcome ?? null,
+      title: check.title ?? null,
+      detail: check.detail ?? null,
+      derivedFromCheckIds: (check.derivedFromCheckIds ?? []).filter(Boolean),
+      issues: resolveIssues((check.issueIds ?? []).filter(Boolean), index),
+    }));
 }
 
 /**
@@ -1280,6 +1385,16 @@ function adaptSignature(signature: SignatureV6, index: ReportIndex): Verificatio
   const distinguishedName =
     signature.signerIdentity?.distinguishedName ?? signerCert?.subject?.dn ?? "";
 
+  // Hai mốc thời gian rời nhau và không được gộp: `bestSignatureTime` là Proof of
+  // Existence do engine chứng minh, `claimedProperties.signingTime` là lời khai
+  // của chính người ký. Gộp lại rồi hiện một dòng "Thời gian ký" là biến lời khai
+  // thành sự thật đã xác minh.
+  const provenSigningTime = signature.timeValidation?.bestSignatureTime ?? null;
+  const claimedSigningTime =
+    signature.claimedProperties?.signingTime?.value ??
+    signature.timeValidation?.claimedSigningTime ??
+    null;
+
   return {
     signatureId: signature.signatureId,
     index: signature.index,
@@ -1293,14 +1408,18 @@ function adaptSignature(signature: SignatureV6, index: ReportIndex): Verificatio
     achievedBaselineLevel: signature.profile?.achieved ?? null,
     missingForNextLevel: signature.profile?.missingForNextLevel ?? [],
     relation: signature.relation ?? null,
-    signingTime:
-      signature.timeValidation?.bestSignatureTime ??
-      signature.claimedProperties?.signingTime?.value ??
-      signature.timeValidation?.claimedSigningTime ??
-      null,
-    signingTimeTrusted:
-      signature.claimedProperties?.signingTime?.independentlyTrusted ??
-      timestamps.some((ts) => ts.trustedTime),
+    signingTime: provenSigningTime ?? claimedSigningTime,
+    provenSigningTime,
+    claimedSigningTime,
+    // Chỉ Proof of Existence mới làm thời điểm ký đáng tin. KHÔNG đọc
+    // `claimedProperties.signingTime.independentlyTrusted` ở đây: field đó nằm
+    // trong chính lời khai đang cần được chứng minh.
+    signingTimeTrusted: Boolean(provenSigningTime),
+    // Mục 4.2 của hướng dẫn 6.1: câu hỏi "verifier có tin nguồn thời gian này
+    // không" chỉ có một chỗ trả lời, và đó là `timestamps[0].trustedTime` —
+    // không phải outcome của check dấu thời gian.
+    trustedTimestampAvailable: timestamps[0]?.trustedTime ?? false,
+    primaryChecks: adaptPrimaryChecks(signature.primaryChecks, index),
     signer: displayName
       ? {
           commonName: displayName,
@@ -1434,6 +1553,7 @@ export function adaptV6ReportToView(report: VerificationReportV6): VerificationR
     mainIndication: summary.etsi.mainIndication,
     subIndications: summary.etsi.subIndications ?? [],
     completeness: summary.validationCompleteness ?? null,
+    primaryChecks: adaptPrimaryChecks(summary.primaryChecks, index),
     contentType: contentTypeOf(data.document),
     fileName: data.document.fileName ?? "",
     fileSize: data.document.fileSize,

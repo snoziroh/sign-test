@@ -19,23 +19,30 @@ export class SigningApiClientError extends Error {
 }
 
 /**
- * Đọc thân lỗi RFC 7807 của service: `{ type, title, status, detail, instance,
- * code, correlationId }`. `code` là thứ duy nhất được rẽ nhánh; `detail` là câu
- * tiếng Việt do backend viết, thường đã đủ rõ nên được hiển thị nguyên văn khi
- * client không có câu riêng.
+ * Đọc thân lỗi của service: `{ type, title, status, detail, instance, code,
+ * correlationId }`. `code` là thứ duy nhất được rẽ nhánh; `detail` là câu tiếng
+ * Việt do backend viết, thường đã đủ rõ nên được hiển thị nguyên văn khi client
+ * không có câu riêng.
  *
  * Lỗi validation của framework (thiếu tham số bắt buộc) KHÔNG có `code` — khi đó
  * `title` là thứ duy nhất còn lại để phân biệt.
+ *
+ * Phân hệ QUY TRÌNH KÝ đặt câu mô tả ở `message` chứ không ở `detail`
+ * (`ApiErrorResponse` của nó không phải RFC 7807). Đọc cả hai, nếu không thì mọi
+ * lỗi nghiệp vụ của phân hệ đó — "Template code already exists",
+ * "Signature slot must lie completely inside the page" — đều rơi xuống câu mặc
+ * định và người dùng chỉ còn nhìn thấy một mã viết hoa.
  */
 export async function readProblem(response: Response): Promise<SigningApiClientError> {
   const body = (await response.json().catch(() => ({}))) as SigningApiErrorBody & {
     title?: string;
+    message?: string;
     correlationId?: string | null;
   };
   return new SigningApiClientError(
     response.status,
     body.code ?? body.title ?? "UNKNOWN_ERROR",
-    body.detail,
+    body.detail ?? body.message,
     body.correlationId ?? response.headers.get("x-correlation-id") ?? undefined,
   );
 }
@@ -140,6 +147,66 @@ export const SIGNING_ERROR_MESSAGES: Record<string, string> = {
    */
   USB_TOKEN_SIGNATURE_INVALID:
     "Chữ ký từ USB Token không khớp thuật toán của phiên ký. Thường là do chọn RSA-PSS hoặc ECDSA trong khi FPT Signing Agent chỉ ký được RSA PKCS#1 v1.5.",
+
+  /*
+   * Phân hệ quy trình ký — soạn mẫu.
+   *
+   * Chỉ dịch những mã mà người soạn TỰ SỬA ĐƯỢC. Các mã còn lại
+   * (`TEMPLATE_FIELD_INVALID`, `SIGNATURE_SLOT_INVALID`…) cố tình để trống: câu
+   * `message` của backend chỉ đúng ô nào, vai nào, sai chỗ nào, và một câu dịch
+   * chung chung sẽ che mất chính thông tin đó.
+   */
+  TEMPLATE_CODE_ALREADY_EXISTS:
+    "Mã mẫu này đã có trên hệ thống. Đổi sang một mã khác rồi nộp lại.",
+  TEMPLATE_ALREADY_PUBLISHED:
+    "Bản này đã được publish rồi. Tải lại danh sách mẫu để thấy trạng thái mới nhất.",
+  TEMPLATE_NOT_READY_TO_PUBLISH:
+    "Bản nháp chưa đủ điều kiện publish: phải cấu hình hết biến, có ít nhất một vai ký, và mỗi vai bắt buộc phải có khung chữ ký.",
+  TEMPLATE_VERSION_IMMUTABLE:
+    "Bản đã publish là bất biến, không sửa được biến hay vai ký nữa. Dịch vụ chưa có API tạo bản mới.",
+  TEMPLATE_NOT_EDITABLE:
+    "Chỉ mẫu còn ở trạng thái nháp mới sửa được tên và mô tả.",
+  SIGNATURE_SLOT_OUT_OF_BOUNDS:
+    "Khung chữ ký nằm ngoài trang. Kéo nó vào trong mép giấy rồi lưu lại.",
+  /*
+   * Nhiều người/vai cùng một `signingOrder` là HỢP LỆ (ký song song) và dịch vụ
+   * tự nén dải số về 1..N, nên mã này không còn nói về chuyện trùng số hay hụt
+   * số nữa. Còn lại đúng hai ca: `signingOrder < 1`, và gửi thứ tự ký cho một
+   * phần người ký trong khi những người khác bỏ trống.
+   */
+  SIGNING_ORDER_INVALID:
+    "Thứ tự ký không hợp lệ: phải đếm từ 1, và hoặc mọi người ký đều có thứ tự, hoặc không ai có.",
+  FILE_TYPE_NOT_ALLOWED: "Mẫu chỉ nhận tệp DOCX và XLSX.",
+  FILE_TOO_LARGE: "Tệp vượt quá dung lượng tối đa của dịch vụ.",
+  PDF_CONVERSION_FAILED:
+    "Không chuyển được tài liệu sang PDF. Kiểm tra dịch vụ chuyển đổi (Gotenberg) đã chạy chưa.",
+
+  /*
+   * Phân hệ quy trình ký — ký một ô (`POST /api/signing-requests/{id}/sign`).
+   *
+   * Năm mã 409 đầu tiên KHÔNG phải hỏng hóc: mỗi mã có một đường ra riêng, và
+   * giao diện ký của quy trình (`workflow-sign-workspace.tsx`) bắt riêng hai mã đầu
+   * để dựng nút "tiếp tục lượt ký" và khối "tài liệu vừa đổi". Câu ở đây là
+   * phương án cuối cùng — khi mã đó rơi vào một chỗ không có nhánh riêng.
+   */
+  SIGNING_ALREADY_STARTED:
+    "Lượt ký trước của bạn vẫn đang mở ở dịch vụ ký. Hãy tiếp tục lượt đó thay vì bắt đầu lại.",
+  SIGNING_NOT_STARTED:
+    "Không còn lượt ký nào đang mở để tiếp tục — phiên đã hết hoặc đã được giải phóng. Hãy ký lại từ đầu.",
+  SIGNING_DOCUMENT_CHANGED:
+    "Tài liệu đã đổi kể từ lúc bạn bắt đầu ký: một người cùng bước đã ký xong trước. Tải lại rồi ký lại trên bản mới.",
+  SIGNING_LEASE_LOCKED:
+    "Một người ký khác đã giành được lượt ký này trước. Chờ họ hoàn tất — màn hình tự mở lại khi tới lượt bạn.",
+  SIGNING_LEASE_LOST:
+    "Lượt ký của bạn đã hết hạn hoặc được chuyển cho người khác. Mọi bước đang dở đã bị bỏ; hãy bắt đầu lại từ đầu.",
+  SIGNING_LEASE_REQUIRED:
+    "Không tìm thấy quyền ký cục bộ cho lượt này. Quay lại màn quy trình và bấm Ký ngay để giành lại quyền ký.",
+  SIGNER_NOT_CURRENT:
+    "Chưa tới lượt ký của người này. Các bước trước phải hoàn tất đã.",
+  SIGNER_ALREADY_PROCESSED:
+    "Ô này đã ký hoặc đã từ chối rồi — không ký thêm lần nữa được.",
+  SIGNED_DOCUMENT_MISSING:
+    "Dịch vụ ký báo hoàn tất nhưng không trả về tệp đã ký, nên không có gì để lưu vào quy trình. Đừng thử lại ngay: kiểm tra log của dịch vụ ký trước.",
 
   /* TSA */
   TSA_NOT_AVAILABLE:
